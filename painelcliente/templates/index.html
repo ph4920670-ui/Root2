@@ -2398,6 +2398,24 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
 .bots-quick-btn.restart{ background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(168,85,247,0.04)); border-color:rgba(168,85,247,0.35); color:#d6bcff; }
 .bots-quick-btn.stop{ background:linear-gradient(135deg,rgba(239,68,68,0.16),rgba(239,68,68,0.04)); border-color:rgba(239,68,68,0.32); color:#fca5a5; }
 
+/* ── Config embutida na view Bots ── */
+.bots-config{
+  border-radius:22px; overflow:hidden;
+  border:1px solid var(--border); background:var(--card);
+  box-shadow:0 1px 0 0 rgba(255,255,255,0.06) inset, 0 18px 40px -28px rgba(0,0,0,0.8);
+  backdrop-filter:blur(22px) saturate(140%); -webkit-backdrop-filter:blur(22px) saturate(140%);
+}
+.bots-config .config-page{ border:none !important; background:transparent !important; box-shadow:none !important; backdrop-filter:none !important; }
+.bots-config .btn-voltar{ display:none !important; }
+.bots-cfg-empty{ padding:26px; text-align:center; color:var(--text3); font-size:13px; }
+
+/* ── Destaque temporário no comando .pix quando o usuário toca em "Sacar" ── */
+.wlt-cmd-hl{
+  border-color:rgba(168,85,247,0.6) !important;
+  box-shadow:0 0 0 1px rgba(168,85,247,0.4), 0 0 22px -4px rgba(168,85,247,0.8) !important;
+  transition:box-shadow .25s, border-color .25s;
+}
+
 /* desktop: a view Bots fica enxuta e centralizada (caso acessada via teclado) */
 @media (min-width:641px){
   #view-bots{ max-width:760px; }
@@ -2958,9 +2976,9 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
             <span class="wlt-action-ico">↓</span>
             <div><div class="wlt-action-t">Depositar</div><div class="wlt-action-s">Adicionar saldo via PIX</div></div>
           </button>
-          <button class="wlt-action sacar" onclick="abrirSacarWallet2()">
+          <button class="wlt-action sacar" onclick="infoSaqueComando()">
             <span class="wlt-action-ico">↑</span>
-            <div><div class="wlt-action-t">Sacar</div><div class="wlt-action-s">Enviar saldo pra sua chave PIX</div></div>
+            <div><div class="wlt-action-t">Sacar</div><div class="wlt-action-s">Saque só pelo comando <b>.pix</b> no Discord</div></div>
           </button>
           <div class="wlt-mini">
             <div class="wlt-mini-item"><div class="wlt-mini-lab">Entradas</div><div class="wlt-mini-val up">R$ <span id="wlt-entradas">0,00</span></div></div>
@@ -3026,6 +3044,11 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
         <button class="bots-quick-btn start" onclick="botAction('start')"><span>▶</span> Iniciar</button>
         <button class="bots-quick-btn restart" onclick="botAction('restart')"><span>↻</span> Reiniciar</button>
         <button class="bots-quick-btn stop" onclick="botAction('stop')"><span>■</span> Parar</button>
+      </div>
+
+      <div class="bots-sec-title" style="margin-top:24px;">Configuração do bot</div>
+      <div class="bots-config" id="bots-config-host">
+        <div class="bots-cfg-empty">Carregando configurações…</div>
       </div>
     </div>
 
@@ -3562,6 +3585,17 @@ function carregarBots(){
     set('bots-saldo-salas', txt('hero-saldo') || '0');
     const atend = (parseInt(txt('ev-pagamentos'))||0) + (parseInt(txt('ev-gos'))||0) + (parseInt(txt('ev-msgs'))||0);
     set('bots-atend', atend + ' interações hoje');
+
+    // Traz a configuração do bot pra dentro da view Bots. Reaproveita o MESMO
+    // nó DOM da página de config (ids/handlers intactos, sem duplicar) — só
+    // muda de lugar uma vez. renderConfig() continua atualizando normalmente.
+    const host = document.getElementById('bots-config-host');
+    const cfgPage = document.querySelector('#view-config .config-page');
+    if (host && cfgPage && cfgPage.parentElement !== host){
+      host.innerHTML = '';
+      host.appendChild(cfgPage);
+    }
+    try { if (typeof renderConfig === 'function') renderConfig(); } catch(e) {}
   } catch(e) {}
 }
 // Toggle do bot a partir da view Bots → reaproveita botAction()
@@ -3651,6 +3685,17 @@ async function abrirDepositar(){
   } catch(e){ toast('Erro de rede ao gerar PIX.', 'erro'); }
 }
 
+function infoSaqueComando(){
+  // Saque da carteira/wallet2 é feito SÓ pelo comando no Discord (.pix).
+  // O painel só exibe saldo e extrato.
+  toast('Saque é feito pelo comando .pix [chave] [valor] no Discord.', 'ok');
+  const cmds = document.querySelector('.wlt-cmds');
+  if (cmds){
+    cmds.scrollIntoView({behavior:'smooth', block:'center'});
+    const pix = cmds.querySelector('.wlt-cmd');
+    if (pix){ pix.classList.add('wlt-cmd-hl'); setTimeout(()=>pix.classList.remove('wlt-cmd-hl'), 2200); }
+  }
+}
 async function abrirSacarWallet2(){
   // Saque da wallet2 (payout PIX): pede valor, tipo e chave PIX.
   const v = prompt('Quanto deseja sacar? (R$)\nMínimo R$ 1,00', '10');
