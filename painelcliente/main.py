@@ -1956,7 +1956,7 @@ def api_wallet2_depositar():
     except Exception as e:
         return jsonify({'ok': False, 'msg': f'wallet2 indisponível: {e}'}), 500
     if not w2.turbofy_ok():
-        return jsonify({'ok': False, 'msg': 'Wallet2 não configurada.'}), 400
+        return jsonify({'ok': False, 'msg': 'Pagamentos indisponíveis: credenciais TURBOFY_CLIENT_ID/TURBOFY_SECRET não configuradas. Configure no .env (ou nas Variáveis do Discloud) e reinicie o bot.', 'code': 'WALLET2_SEM_CRED'}), 400
     data = request.get_json(silent=True) or {}
     try:
         valor = float(str(data.get('valor', '')).replace(',', '.'))
@@ -2004,7 +2004,7 @@ def api_wallet2_sacar():
     except Exception as e:
         return jsonify({'ok': False, 'msg': f'wallet2 indisponível: {e}'}), 500
     if not w2.turbofy_ok():
-        return jsonify({'ok': False, 'msg': 'Wallet2 não configurada.'}), 400
+        return jsonify({'ok': False, 'msg': 'Pagamentos indisponíveis: credenciais TURBOFY_CLIENT_ID/TURBOFY_SECRET não configuradas. Configure no .env (ou nas Variáveis do Discloud) e reinicie o bot.', 'code': 'WALLET2_SEM_CRED'}), 400
     data = request.get_json(silent=True) or {}
     try:
         valor = float(str(data.get('valor', '')).replace(',', '.'))
