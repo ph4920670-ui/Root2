@@ -3062,14 +3062,12 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
         </div>
         <div class="cmp-rows">
           <div class="cmp-r"><span>Nome</span><b id="cmp-nome">—</b></div>
-          <div class="cmp-r"><span>Instituição</span><b id="cmp-banco">EfiBank</b></div>
           <div class="cmp-r"><span>Descrição</span><b id="cmp-desc">—</b></div>
           <div class="cmp-r"><span>Data e hora</span><b id="cmp-data">—</b></div>
           <div class="cmp-r"><span>Status</span><b id="cmp-status">—</b></div>
           <div class="cmp-r"><span>Autenticação</span><b class="cmp-mono" id="cmp-auth">—</b></div>
         </div>
         <div class="cmp-foot">
-          <div class="cmp-brand"><span class="cmp-brand-dot"></span> EfiBank · Instituição de Pagamento</div>
           <div class="cmp-legal">Comprovante gerado eletronicamente. Documento sem valor fiscal.</div>
         </div>
         <button class="cmp-copy" onclick="copiarComprovante()">Copiar comprovante</button>
@@ -3744,11 +3742,10 @@ function _esc(s){ const d=document.createElement('div'); d.textContent=s==null?'
 
 // ═══════════ COMPROVANTE (extrato → recibo PIX) ═══════════
 // Gera um comprovante a partir de uma linha do extrato. Puxa o nome do
-// cliente e disfarça SEMPRE a instituição como "EfiBank" — o provedor real
-// (gateway PIX) nunca aparece pro cliente, pra ninguém copiar a operação.
+// cliente. NÃO exibe instituição/banco nenhum — o provedor real (gateway
+// PIX) nunca aparece pro cliente, pra ninguém copiar a operação.
 let _extratoAtual = [];
 let _carteiraNome = '—';
-const _COMPROV_BANCO = 'EfiBank';   // rótulo de fachada (provedor real escondido)
 
 // Deriva um id de autenticação curto e estável a partir do que a transação tiver.
 function _comprovAuth(t){
@@ -3773,7 +3770,6 @@ function abrirComprovante(i){
   set('cmp-valor', 'R$ ' + _fmtMoney(t.valor));
   set('cmp-tipo', dep ? 'PIX recebido' : 'PIX enviado');
   set('cmp-nome', nome);
-  set('cmp-banco', _COMPROV_BANCO);
   set('cmp-data', dataFmt);
   set('cmp-status', status);
   set('cmp-auth', auth);
@@ -3789,11 +3785,10 @@ function fecharComprovante(){
 }
 function copiarComprovante(){
   const linhas = [
-    'COMPROVANTE PIX — EfiBank',
+    'COMPROVANTE PIX',
     document.getElementById('cmp-tipo').textContent,
     'Valor: ' + document.getElementById('cmp-valor').textContent,
     'Nome: ' + document.getElementById('cmp-nome').textContent,
-    'Instituição: ' + document.getElementById('cmp-banco').textContent,
     'Data: ' + document.getElementById('cmp-data').textContent,
     'Autenticação: ' + document.getElementById('cmp-auth').textContent,
     'Status: ' + document.getElementById('cmp-status').textContent,
