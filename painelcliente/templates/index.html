@@ -2402,6 +2402,28 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
 .bots-quick-btn.restart{ background:linear-gradient(135deg,rgba(168,85,247,0.18),rgba(168,85,247,0.04)); border-color:rgba(168,85,247,0.35); color:#d6bcff; }
 .bots-quick-btn.stop{ background:linear-gradient(135deg,rgba(239,68,68,0.16),rgba(239,68,68,0.04)); border-color:rgba(239,68,68,0.32); color:#fca5a5; }
 
+/* ── Servidores (onde cai a fila) ── */
+.bots-srv-count{ font-size:12px; font-weight:600; color:#c4b5fd; background:rgba(168,85,247,0.14); border:1px solid rgba(168,85,247,0.3); padding:3px 10px; border-radius:99px; margin-left:6px; }
+.bots-srv-hint{ font-size:12px; color:var(--text3); margin:-2px 0 12px; }
+.bots-servidores{ display:flex; flex-direction:column; gap:10px; }
+.srv-card{ border-radius:18px; border:1px solid var(--border); background:var(--card); overflow:hidden; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); }
+.srv-card.vazio{ border-style:dashed; }
+.srv-head{ display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; }
+.srv-ico{ width:34px; height:34px; flex:none; border-radius:10px; display:grid; place-items:center; font-weight:700; font-size:15px; color:#d6bcff; background:rgba(168,85,247,0.16); border:1px solid rgba(168,85,247,0.32); }
+.srv-info{ flex:1; min-width:0; }
+.srv-t{ font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--text); }
+.srv-s{ font-size:12px; color:var(--text3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.srv-arrow{ color:var(--text3); font-size:20px; transition:transform .2s; }
+.srv-card.aberto .srv-arrow{ transform:rotate(90deg); }
+.srv-body{ display:none; padding:0 16px 16px; }
+.srv-card.aberto .srv-body{ display:block; }
+.srv-lbl{ display:block; font-size:11.5px; font-weight:600; color:var(--text2); margin:10px 0 5px; }
+.srv-inp{ width:100%; padding:11px 13px; border-radius:11px; font-size:13px; background:rgba(0,0,0,0.28); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; }
+.srv-inp:focus{ outline:none; border-color:rgba(168,85,247,0.55); box-shadow:0 0 0 1px rgba(168,85,247,0.3); }
+.srv-save{ width:100%; margin-top:12px; padding:12px; border:none; border-radius:12px; cursor:pointer; font-weight:700; font-size:13.5px; color:#fff; background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 12px 26px -12px rgba(124,58,237,0.9); }
+.srv-save:disabled{ opacity:.6; cursor:not-allowed; }
+.srv-help{ font-size:11px; color:var(--text3); margin-top:9px; line-height:1.5; }
+
 /* ── Config embutida na view Bots ── */
 .bots-config{
   border-radius:22px; overflow:hidden;
@@ -3182,6 +3204,10 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
         <button class="bots-quick-btn stop" onclick="botAction('stop')"><span>■</span> Parar</button>
       </div>
 
+      <div class="bots-sec-title" style="margin-top:24px;">Servidores <span id="bots-srv-count" class="bots-srv-count">—</span></div>
+      <div class="bots-srv-hint">Toque num servidor pra definir o canal e a categoria onde a fila cai.</div>
+      <div class="bots-servidores" id="bots-servidores"></div>
+
       <div class="bots-sec-title" style="margin-top:24px;">Token do bot</div>
       <div class="bots-token">
         <div class="bots-token-head">
@@ -3760,6 +3786,7 @@ function carregarBots(){
       host.appendChild(cfgPage);
     }
     try { if (typeof renderConfig === 'function') renderConfig(); } catch(e) {}
+    try { renderServidores(); } catch(e) {}
   } catch(e) {}
 }
 // ── Troca manual do token do bot (DISCORD_TOKEN via /api/salvar-campo) ──
@@ -3796,6 +3823,103 @@ async function salvarTokenBot(){
     toast('Erro de rede ao salvar o token.', 'err');
   } finally {
     if (btn){ btn.disabled = false; btn.textContent = 'Salvar novo token'; }
+  }
+}
+
+// ── Servidores (onde cai a fila) na view Bots ──
+// Slot 1 = principal (GUILD_IDS / FORUM_CHANNEL_IDS / CATEGORIA_ID, salvos via
+// /api/salvar-campo). Slots 2..N = servidores_extra [{guild, canal}], salvos via
+// /api/servidor-extra. N = servidores_permitidos.
+function renderServidores(){
+  const host = document.getElementById('bots-servidores');
+  if (!host) return;
+  const permitidos = Math.max(1, parseInt(dados.servidores_permitidos) || 1);
+  const extras = dados.servidores_extra || [];
+  const cnt = document.getElementById('bots-srv-count');
+  if (cnt) cnt.textContent = `${permitidos} permitido${permitidos>1?'s':''}`;
+  let html = '';
+  for (let slot = 1; slot <= permitidos; slot++){
+    let guild = '', canal = '', categoria = '', principal = (slot === 1);
+    if (principal){
+      guild = cfg.GUILD_IDS || '';
+      canal = cfg.FORUM_CHANNEL_IDS || '';
+      categoria = cfg.CATEGORIA_ID || '';
+    } else {
+      const e = extras[slot - 2] || {};
+      guild = e.guild || ''; canal = e.canal || '';
+    }
+    const configurado = !!guild;
+    const sub = configurado ? `Servidor ${_esc(guild)}` : 'Não configurado — toque pra definir';
+    html += `
+      <div class="srv-card ${configurado?'':'vazio'}" id="srv-card-${slot}">
+        <div class="srv-head" onclick="toggleServidor(${slot})">
+          <div class="srv-ico">${principal?'★':slot}</div>
+          <div class="srv-info">
+            <div class="srv-t">${principal?'Servidor principal':'Servidor '+slot}</div>
+            <div class="srv-s">${sub}</div>
+          </div>
+          <div class="srv-arrow">›</div>
+        </div>
+        <div class="srv-body" id="srv-body-${slot}">
+          <label class="srv-lbl">ID do servidor (guild)</label>
+          <input class="srv-inp" id="srv-guild-${slot}" inputmode="numeric" placeholder="Ex: 1293555181547683923" value="${_esc(guild)}">
+          <label class="srv-lbl">Canal onde cai a fila</label>
+          <input class="srv-inp" id="srv-canal-${slot}" inputmode="numeric" placeholder="ID do canal (ou categoria) da fila" value="${_esc(canal)}">
+          ${principal ? `
+          <label class="srv-lbl">Categoria (opcional)</label>
+          <input class="srv-inp" id="srv-cat-${slot}" inputmode="numeric" placeholder="ID da categoria" value="${_esc(categoria)}">` : ''}
+          <button class="srv-save" onclick="salvarServidor(${slot}, ${principal})">Salvar servidor ${slot}</button>
+          <div class="srv-help">Pra pegar o ID: ative o Modo Desenvolvedor no Discord → clique direito no servidor/canal → Copiar ID.</div>
+        </div>
+      </div>`;
+  }
+  host.innerHTML = html;
+}
+function toggleServidor(slot){
+  const card = document.getElementById('srv-card-'+slot);
+  if (card) card.classList.toggle('aberto');
+}
+async function salvarServidor(slot, principal){
+  const val = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+  const guild = val('srv-guild-'+slot);
+  const canal = val('srv-canal-'+slot);
+  if (!guild){ toast('Informe o ID do servidor.', 'erro'); return; }
+  const btn = document.querySelector(`#srv-body-${slot} .srv-save`);
+  if (btn){ btn.disabled = true; btn.textContent = 'Salvando…'; }
+  try {
+    if (principal){
+      // Salva os 3 campos do servidor principal via /api/salvar-campo.
+      const categoria = val('srv-cat-'+slot);
+      const salvarCampo = async (campo, valor) => {
+        const r = await fetch('/api/salvar-campo', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({campo, valor})
+        });
+        return r.json();
+      };
+      await salvarCampo('GUILD_IDS', guild);
+      await salvarCampo('FORUM_CHANNEL_IDS', canal);
+      await salvarCampo('CATEGORIA_ID', categoria);
+      cfg.GUILD_IDS = guild; cfg.FORUM_CHANNEL_IDS = canal; cfg.CATEGORIA_ID = categoria;
+      toast('✓ Servidor principal salvo. Reinicie o bot pra aplicar.', 'ok');
+    } else {
+      const r = await fetch('/api/servidor-extra', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({slot, guild, canal})
+      });
+      const d = await r.json();
+      if (!d.ok){ toast(d.msg || 'Erro ao salvar servidor.', 'erro'); return; }
+      // atualiza estado local
+      dados.servidores_extra = dados.servidores_extra || [];
+      while (dados.servidores_extra.length <= slot-2) dados.servidores_extra.push({guild:'',canal:''});
+      dados.servidores_extra[slot-2] = {guild, canal};
+      toast('✓ ' + (d.msg || 'Servidor salvo.'), 'ok');
+    }
+    renderServidores();
+  } catch(e){
+    toast('Erro de rede ao salvar servidor.', 'erro');
+  } finally {
+    if (btn){ btn.disabled = false; btn.textContent = `Salvar servidor ${slot}`; }
   }
 }
 

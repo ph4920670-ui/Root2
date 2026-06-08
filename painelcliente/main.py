@@ -2206,8 +2206,66 @@ def api_dados():
         # o client_id identifica o cliente e o token autentica os POSTs.
         'client_id': doc.get('client_id', '') if doc else (client_id or ''),
         'pix_notif_token': doc.get('pix_notif_token', '') if doc else '',
+        # Servidores: quantos o cliente pode operar + os extras já configurados.
+        # Slot 1 = servidor principal (GUILD_IDS/FORUM_CHANNEL_IDS/CATEGORIA_ID).
+        # Slots 2..N = servidores_extra [{guild, canal}] (onde cai a fila).
+        'servidores_permitidos': int(doc.get('servidores_permitidos', 1) or 1) if doc else 1,
+        'servidores_extra': [
+            {'guild': str(s.get('guild', '')), 'canal': str(s.get('canal', ''))}
+            for s in (doc.get('servidores_extra') or []) if isinstance(s, dict)
+        ] if doc else [],
         'from_env': False,
     })
+
+
+def _doc_cliente_logado():
+    """Resolve o doc do cliente logado (mesmo padrão do /api/dados)."""
+    doc = None
+    did = session.get('doc_id')
+    cid = session.get('client_id')
+    if did:
+        try:
+            doc = clientes_col.find_one({'_id': ObjectId(did)})
+        except Exception:
+            doc = None
+    if not doc and cid:
+        doc = clientes_col.find_one({'client_id': cid})
+    return doc
+
+
+@app.route('/api/servidor-extra', methods=['POST'])
+def api_servidor_extra():
+    """Salva um servidor EXTRA (slot 2..N) onde a fila cai. Body: {slot, guild,
+    canal}. Respeita servidores_permitidos. Slot 1 é o principal (editado pelos
+    campos GUILD_IDS/FORUM_CHANNEL_IDS/CATEGORIA_ID via /api/salvar-campo)."""
+    if not session.get('logado'):
+        return jsonify({'ok': False}), 401
+    if not session.get('client_id') and not session.get('doc_id'):
+        return jsonify({'ok': False, 'msg': 'Admin não pode editar por aqui.'}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        slot = int(data.get('slot') or 0)
+    except (TypeError, ValueError):
+        slot = 0
+    guild = ''.join(ch for ch in str(data.get('guild') or '') if ch.isdigit())
+    canal = ''.join(ch for ch in str(data.get('canal') or '') if ch.isdigit())
+    if slot < 2:
+        return jsonify({'ok': False, 'msg': 'Slot inválido.'}), 400
+    doc = _doc_cliente_logado()
+    if not doc:
+        return jsonify({'ok': False, 'msg': 'Cliente não encontrado.'}), 404
+    limite = int(doc.get('servidores_permitidos', 1) or 1)
+    if slot > limite:
+        return jsonify({'ok': False, 'msg': f'Seu plano permite até {limite} servidor(es).'}), 403
+    if not guild:
+        return jsonify({'ok': False, 'msg': 'Informe o ID do servidor.'}), 400
+    extras = list(doc.get('servidores_extra') or [])
+    idx = slot - 2
+    while len(extras) <= idx:
+        extras.append({'guild': '', 'canal': ''})
+    extras[idx] = {'guild': guild, 'canal': canal}
+    clientes_col.update_one({'_id': doc['_id']}, {'$set': {'servidores_extra': extras}})
+    return jsonify({'ok': True, 'msg': 'Servidor salvo. Reinicie o bot pra aplicar.'})
 
 
 @app.route('/api/salvar-campo', methods=['POST'])
