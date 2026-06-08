@@ -2421,6 +2421,54 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
   #view-bots{ max-width:760px; }
   .bots-metrics{ grid-template-columns:repeat(4,1fr); }
 }
+
+/* ── Extrato: dica + linha clicável ── */
+.wlt-extrato-hint{ font-size:12px; color:var(--text3); margin:-2px 0 12px; }
+.wlt-row{ cursor:pointer; transition:background .15s, transform .15s; }
+.wlt-row:hover{ background:rgba(168,85,247,0.07); }
+.wlt-row:active{ transform:scale(0.99); }
+.wlt-row-ver{ color:#c4b5fd; font-weight:600; }
+
+/* ── MODAL COMPROVANTE PIX (fachada EfiBank) ── */
+.cmp-overlay{
+  position:fixed; inset:0; z-index:2000; display:none;
+  align-items:flex-end; justify-content:center;
+  background:rgba(5,4,12,0.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  padding:0;
+}
+.cmp-overlay.aberto{ display:flex; animation:cmpFade .2s ease; }
+@keyframes cmpFade{ from{opacity:0} to{opacity:1} }
+.cmp-box{
+  position:relative; width:100%; max-width:440px;
+  background:linear-gradient(180deg, rgba(22,18,36,0.98), rgba(13,11,22,0.98));
+  border:1px solid rgba(168,85,247,0.22); border-bottom:none;
+  border-radius:26px 26px 0 0;
+  padding:26px 22px calc(22px + env(safe-area-inset-bottom));
+  box-shadow:0 -20px 60px -20px rgba(124,58,237,0.6);
+  animation:cmpUp .26s cubic-bezier(.2,.9,.25,1);
+}
+@keyframes cmpUp{ from{transform:translateY(40px)} to{transform:translateY(0)} }
+@media (min-width:641px){ .cmp-overlay{ align-items:center; } .cmp-box{ border-radius:26px; border-bottom:1px solid rgba(168,85,247,0.22); } }
+.cmp-close{ position:absolute; top:14px; right:16px; width:34px; height:34px; border-radius:11px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:var(--text2); font-size:20px; cursor:pointer; line-height:1; }
+.cmp-top{ text-align:center; padding:6px 0 18px; border-bottom:1px dashed rgba(255,255,255,0.12); margin-bottom:16px; }
+.cmp-badge{ width:54px; height:54px; border-radius:50%; display:grid; place-items:center; margin:4px auto 12px; font-size:26px; font-weight:800; color:#fff; }
+.cmp-badge.in{ background:linear-gradient(135deg,#34d399,#10b981); box-shadow:0 0 0 6px rgba(52,211,153,0.14), 0 10px 26px -8px rgba(16,185,129,0.8); }
+.cmp-badge.out{ background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 0 0 6px rgba(168,85,247,0.14), 0 10px 26px -8px rgba(124,58,237,0.8); }
+.cmp-titulo{ font-size:13px; color:var(--text3); font-weight:600; }
+.cmp-valor{ font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; letter-spacing:-0.8px; color:var(--text); margin:4px 0 2px; }
+.cmp-tipo{ font-size:12.5px; color:var(--text2); }
+.cmp-rows{ display:flex; flex-direction:column; gap:0; }
+.cmp-r{ display:flex; justify-content:space-between; align-items:center; gap:14px; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+.cmp-r:last-child{ border-bottom:none; }
+.cmp-r span{ font-size:13px; color:var(--text3); flex:none; }
+.cmp-r b{ font-size:13.5px; color:var(--text); font-weight:600; text-align:right; word-break:break-word; }
+.cmp-mono{ font-family:'JetBrains Mono','Space Grotesk',monospace !important; font-size:12px !important; color:#c4b5fd !important; }
+.cmp-foot{ margin-top:16px; padding-top:14px; border-top:1px dashed rgba(255,255,255,0.12); text-align:center; }
+.cmp-brand{ display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--text2); letter-spacing:.2px; }
+.cmp-brand-dot{ width:9px; height:9px; border-radius:50%; background:linear-gradient(135deg,#ff8a3d,#ff5a1f); box-shadow:0 0 8px 1px rgba(255,138,61,0.7); }
+.cmp-legal{ font-size:11px; color:var(--text4,#565667); margin-top:6px; }
+.cmp-copy{ width:100%; margin-top:18px; padding:14px; border:none; border-radius:15px; cursor:pointer; font-weight:700; font-size:14px; color:#fff; background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 12px 28px -12px rgba(124,58,237,0.9); }
+.cmp-copy:active{ transform:translateY(1px); }
 </style>
 
 </head>
@@ -2995,9 +3043,36 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
 
       <div class="wlt-extrato">
         <div class="wlt-extrato-h">Extrato</div>
+        <div class="wlt-extrato-hint">Toque em qualquer movimentação para gerar o comprovante.</div>
         <div id="wlt-extrato-body">
           <div class="wlt-empty">Carregando…</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ MODAL: COMPROVANTE PIX (gerado a partir do extrato) ═══════════ -->
+    <div class="cmp-overlay" id="modal-comprovante" onclick="if(event.target===this)fecharComprovante()">
+      <div class="cmp-box">
+        <button class="cmp-close" onclick="fecharComprovante()" aria-label="Fechar">×</button>
+        <div class="cmp-top">
+          <div class="cmp-badge in" id="cmp-badge">✓</div>
+          <div class="cmp-titulo" id="cmp-titulo">Comprovante</div>
+          <div class="cmp-valor" id="cmp-valor">R$ 0,00</div>
+          <div class="cmp-tipo" id="cmp-tipo">PIX</div>
+        </div>
+        <div class="cmp-rows">
+          <div class="cmp-r"><span>Nome</span><b id="cmp-nome">—</b></div>
+          <div class="cmp-r"><span>Instituição</span><b id="cmp-banco">EfiBank</b></div>
+          <div class="cmp-r"><span>Descrição</span><b id="cmp-desc">—</b></div>
+          <div class="cmp-r"><span>Data e hora</span><b id="cmp-data">—</b></div>
+          <div class="cmp-r"><span>Status</span><b id="cmp-status">—</b></div>
+          <div class="cmp-r"><span>Autenticação</span><b class="cmp-mono" id="cmp-auth">—</b></div>
+        </div>
+        <div class="cmp-foot">
+          <div class="cmp-brand"><span class="cmp-brand-dot"></span> EfiBank · Instituição de Pagamento</div>
+          <div class="cmp-legal">Comprovante gerado eletronicamente. Documento sem valor fiscal.</div>
+        </div>
+        <button class="cmp-copy" onclick="copiarComprovante()">Copiar comprovante</button>
       </div>
     </div>
 
@@ -3641,17 +3716,19 @@ async function carregarCarteira(){
     const body=document.getElementById('wlt-extrato-body');
     if(body){
       const ex=d.extrato||[];
+      _extratoAtual = ex;                       // guarda p/ gerar comprovante
+      _carteiraNome = (document.getElementById('titulo-usuario')||{}).textContent || '—';
       if(!ex.length){ body.innerHTML='<div class="wlt-empty">Nenhuma movimentação ainda.</div>'; }
       else {
-        body.innerHTML=ex.map(t=>{
+        body.innerHTML=ex.map((t,i)=>{
           const dep=t.tipo==='DEPOSITO';
           const st=(t.status||'').toLowerCase();
           const data=t.created_at ? new Date(t.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-          return `<div class="wlt-row">
+          return `<div class="wlt-row" onclick="abrirComprovante(${i})" title="Ver comprovante">
             <div class="wlt-row-ico ${dep?'dep':'saq'}">${dep?'↓':'↑'}</div>
             <div class="wlt-row-info">
               <div class="wlt-row-t">${dep?'Depósito':'Saque'}${t.descricao?(' · '+_esc(t.descricao)):''}</div>
-              <div class="wlt-row-s">${data}</div>
+              <div class="wlt-row-s">${data} · <span class="wlt-row-ver">ver comprovante ›</span></div>
             </div>
             <div style="text-align:right;">
               <div class="wlt-row-val ${dep?'up':'down'}">${dep?'+':'−'} R$ ${_fmtMoney(t.valor)}</div>
@@ -3664,6 +3741,66 @@ async function carregarCarteira(){
   } catch(e){ console.error('carteira', e); }
 }
 function _esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+
+// ═══════════ COMPROVANTE (extrato → recibo PIX) ═══════════
+// Gera um comprovante a partir de uma linha do extrato. Puxa o nome do
+// cliente e disfarça SEMPRE a instituição como "EfiBank" — o provedor real
+// (gateway PIX) nunca aparece pro cliente, pra ninguém copiar a operação.
+let _extratoAtual = [];
+let _carteiraNome = '—';
+const _COMPROV_BANCO = 'EfiBank';   // rótulo de fachada (provedor real escondido)
+
+// Deriva um id de autenticação curto e estável a partir do que a transação tiver.
+function _comprovAuth(t){
+  const base = String(t.id || t.txid || t.transactionId || t.created_at || Math.random());
+  let h = 0; for (let i=0;i<base.length;i++){ h = (h*31 + base.charCodeAt(i)) >>> 0; }
+  const hex = h.toString(16).toUpperCase().padStart(8,'0');
+  return `E${hex}${(h%97).toString().padStart(2,'0')}`;   // formato tipo EndToEnd
+}
+
+function abrirComprovante(i){
+  const t = _extratoAtual[i];
+  if (!t) return;
+  const dep = t.tipo === 'DEPOSITO';
+  const titulo = dep ? 'Comprovante de recebimento' : 'Comprovante de transferência';
+  const data = t.created_at ? new Date(t.created_at) : new Date();
+  const dataFmt = data.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const nome = (t.nome || t.pagador || t.cliente || _carteiraNome || '—');
+  const status = (t.status || 'CONCLUÍDO');
+  const auth = _comprovAuth(t);
+  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+  set('cmp-titulo', titulo);
+  set('cmp-valor', 'R$ ' + _fmtMoney(t.valor));
+  set('cmp-tipo', dep ? 'PIX recebido' : 'PIX enviado');
+  set('cmp-nome', nome);
+  set('cmp-banco', _COMPROV_BANCO);
+  set('cmp-data', dataFmt);
+  set('cmp-status', status);
+  set('cmp-auth', auth);
+  set('cmp-desc', t.descricao || (dep ? 'Depósito na carteira' : 'Saque da carteira'));
+  const badge = document.getElementById('cmp-badge');
+  if (badge) badge.className = 'cmp-badge ' + (dep ? 'in' : 'out');
+  const ov = document.getElementById('modal-comprovante');
+  if (ov) ov.classList.add('aberto');
+}
+function fecharComprovante(){
+  const ov = document.getElementById('modal-comprovante');
+  if (ov) ov.classList.remove('aberto');
+}
+function copiarComprovante(){
+  const linhas = [
+    'COMPROVANTE PIX — EfiBank',
+    document.getElementById('cmp-tipo').textContent,
+    'Valor: ' + document.getElementById('cmp-valor').textContent,
+    'Nome: ' + document.getElementById('cmp-nome').textContent,
+    'Instituição: ' + document.getElementById('cmp-banco').textContent,
+    'Data: ' + document.getElementById('cmp-data').textContent,
+    'Autenticação: ' + document.getElementById('cmp-auth').textContent,
+    'Status: ' + document.getElementById('cmp-status').textContent,
+  ].join('\n');
+  try { navigator.clipboard.writeText(linhas); toast('Comprovante copiado.', 'ok'); }
+  catch(e){ toast('Não foi possível copiar.', 'erro'); }
+}
 let _w2PollTimer = null;
 async function abrirDepositar(){
   // Pergunta o valor e gera uma cobrança PIX (wallet2 / Wallet2).
