@@ -1972,8 +1972,12 @@ h1,h2,h3 { font-family: 'Sora', sans-serif; }
 .bottombar { display: none; }
 
 @media (max-width: 640px) {
-  /* Esconde a sidebar lateral no celular. */
-  .sidebar { display: none !important; }
+  /* A sidebar vira DRAWER (menu das 3 barrinhas) — abre por cima de tudo,
+     inclusive da bottombar. Antes estava display:none, então o burger não
+     mostrava nada (Sair / Trocar Senha ficavam inacessíveis no celular). */
+  .sidebar { z-index: 1000 !important; }
+  .sidebar-overlay { z-index: 999 !important; }
+  .sidebar-overlay.show { display: block !important; }
   /* Conteúdo ocupa a largura toda e ganha espaço embaixo pra não ficar
      atrás da barra fixa. */
   main { margin-left: 0 !important; padding-bottom: 84px !important; }
