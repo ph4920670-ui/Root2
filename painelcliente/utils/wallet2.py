@@ -14,6 +14,14 @@ import json
 import hashlib
 import requests
 
+# Lê o .env mesmo se este módulo for importado isolado ou antes do main.py.
+# Sem isso, TURBOFY_* vinha vazio e o painel dizia "Wallet2 não configurada".
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 TURBOFY_URL = (os.getenv("TURBOFY_URL", "https://api.turbofypay.com") or "").strip().rstrip("/")
 TURBOFY_CLIENT_ID = (os.getenv("TURBOFY_CLIENT_ID", "") or "").strip()
 TURBOFY_SECRET = (os.getenv("TURBOFY_SECRET", "") or "").strip()

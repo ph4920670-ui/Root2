@@ -16,6 +16,12 @@ Assim o painel não quebra antes de você configurar o Supabase.
 import os
 import requests
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 SUPABASE_URL = (os.getenv("SUPABASE_URL", "") or "").strip().rstrip("/")
 SUPABASE_KEY = (os.getenv("SUPABASE_SERVICE_KEY", "") or "").strip()
 

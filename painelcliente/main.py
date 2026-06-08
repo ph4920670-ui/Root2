@@ -11,6 +11,15 @@ from flask import Flask, render_template, request, jsonify, session, g
 from pymongo import MongoClient
 from bson import ObjectId
 
+# Carrega o .env pras variáveis (TURBOFY_*, SUPABASE, etc.) ficarem disponíveis
+# via os.getenv ao rodar localmente ou onde o host não injeta o .env sozinho.
+# Sem isso, a Wallet2 reclamava "Wallet2 não configurada" mesmo com o .env certo.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'painel-secret-2025')
 
