@@ -58,20 +58,29 @@ def get_extrato(client_id: str, limite: int = 20) -> list:
     if not disponivel() or not client_id:
         return []
     url = f"{SUPABASE_URL}/rest/v1/wallet_transactions"
-    params = {
+    base = {
         "client_id": f"eq.{client_id}",
-        "select": "id,tipo,valor,status,txid,pix_key,descricao,created_at",
         "order": "created_at.desc",
         "limit": str(int(limite)),
     }
-    try:
-        r = requests.get(url, headers=_headers(), params=params, timeout=_TIMEOUT)
-        if r.status_code == 200:
-            return r.json() or []
-        return []
-    except Exception as e:
-        print(f"[WALLET] erro get_extrato: {e}", flush=True)
-        return []
+    # Tenta um select rico — inclui o NOME do recebedor/pagador do PIX pra que o
+    # comprovante do site (gerado a partir do extrato) mostre "o nome do cara"
+    # do pagamento .pix. Se o schema não tiver alguma coluna, o PostgREST
+    # devolve 400 e a gente cai no próximo select, até o seguro.
+    selects = [
+        "id,tipo,valor,status,txid,pix_key,descricao,nome,nome_recebedor,pagador,banco,created_at",
+        "id,tipo,valor,status,txid,pix_key,descricao,nome,created_at",
+        "id,tipo,valor,status,txid,pix_key,descricao,created_at",
+    ]
+    for sel in selects:
+        try:
+            params = dict(base, select=sel)
+            r = requests.get(url, headers=_headers(), params=params, timeout=_TIMEOUT)
+            if r.status_code == 200:
+                return r.json() or []
+        except Exception as e:
+            print(f"[WALLET] erro get_extrato: {e}", flush=True)
+    return []
 
 
 def resumo(client_id: str) -> dict:

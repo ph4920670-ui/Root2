@@ -3120,6 +3120,7 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
         </div>
         <div class="cmp-rows">
           <div class="cmp-r"><span>Nome</span><b id="cmp-nome">—</b></div>
+          <div class="cmp-r" id="cmp-chave-row" style="display:none;"><span>Chave PIX</span><b class="cmp-mono" id="cmp-chave">—</b></div>
           <div class="cmp-r"><span>Descrição</span><b id="cmp-desc">—</b></div>
           <div class="cmp-r"><span>Data e hora</span><b id="cmp-data">—</b></div>
           <div class="cmp-r"><span>Status</span><b id="cmp-status">—</b></div>
@@ -3870,6 +3871,13 @@ function _esc(s){ const d=document.createElement('div'); d.textContent=s==null?'
 let _extratoAtual = [];
 let _carteiraNome = '—';
 
+// Tenta extrair um nome de pessoa da descrição da transação (.pix).
+// Ex: "Pagamento PIX para João Silva" → "João Silva".
+function _nomeDaDescricao(desc){
+  if (!desc) return '';
+  const m = String(desc).match(/(?:para|pix p\/|pra|dest\.?:?|recebedor:?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ.'\s]{2,40})/i);
+  return m ? m[1].trim() : '';
+}
 // Deriva um id de autenticação curto e estável a partir do que a transação tiver.
 function _comprovAuth(t){
   const base = String(t.id || t.txid || t.transactionId || t.created_at || Math.random());
@@ -3885,18 +3893,25 @@ function abrirComprovante(i){
   const titulo = dep ? 'Comprovante de recebimento' : 'Comprovante de transferência';
   const data = t.created_at ? new Date(t.created_at) : new Date();
   const dataFmt = data.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  const nome = (t.nome || t.pagador || t.cliente || _carteiraNome || '—');
+  // Nome do "cara" do pagamento .pix: usa o nome do recebedor/pagador gravado
+  // na transação; se não tiver, tenta extrair da descrição; por fim o cliente.
+  const nome = (t.nome || t.nome_recebedor || t.pagador || t.cliente
+                || _nomeDaDescricao(t.descricao) || _carteiraNome || '—');
   const status = (t.status || 'CONCLUÍDO');
   const auth = _comprovAuth(t);
+  const pixKey = t.pix_key || t.chave || '';
   const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+  const show=(id,on)=>{const e=document.getElementById(id); if(e) e.style.display = on ? '' : 'none';};
   set('cmp-titulo', titulo);
   set('cmp-valor', 'R$ ' + _fmtMoney(t.valor));
   set('cmp-tipo', dep ? 'PIX recebido' : 'PIX enviado');
   set('cmp-nome', nome);
+  set('cmp-chave', pixKey);
+  show('cmp-chave-row', !!pixKey);
   set('cmp-data', dataFmt);
   set('cmp-status', status);
   set('cmp-auth', auth);
-  set('cmp-desc', t.descricao || (dep ? 'Depósito na carteira' : 'Saque da carteira'));
+  set('cmp-desc', t.descricao || (dep ? 'Depósito na carteira' : 'Pagamento PIX'));
   const badge = document.getElementById('cmp-badge');
   if (badge) badge.className = 'cmp-badge ' + (dep ? 'in' : 'out');
   const ov = document.getElementById('modal-comprovante');
@@ -3907,15 +3922,17 @@ function fecharComprovante(){
   if (ov) ov.classList.remove('aberto');
 }
 function copiarComprovante(){
+  const chaveRow = document.getElementById('cmp-chave-row');
   const linhas = [
     'COMPROVANTE PIX',
     document.getElementById('cmp-tipo').textContent,
     'Valor: ' + document.getElementById('cmp-valor').textContent,
     'Nome: ' + document.getElementById('cmp-nome').textContent,
+    (chaveRow && chaveRow.style.display !== 'none') ? ('Chave PIX: ' + document.getElementById('cmp-chave').textContent) : null,
     'Data: ' + document.getElementById('cmp-data').textContent,
     'Autenticação: ' + document.getElementById('cmp-auth').textContent,
     'Status: ' + document.getElementById('cmp-status').textContent,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
   try { navigator.clipboard.writeText(linhas); toast('Comprovante copiado.', 'ok'); }
   catch(e){ toast('Não foi possível copiar.', 'erro'); }
 }
