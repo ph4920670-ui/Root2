@@ -35,3 +35,6 @@ warnings.log
 *.pem
 keys_backup.json
 data/.pix_creds_key
+cert.pem
+*.crt
+configadm/

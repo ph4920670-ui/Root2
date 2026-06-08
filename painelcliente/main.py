@@ -1956,7 +1956,8 @@ def api_wallet2_depositar():
     except Exception as e:
         return jsonify({'ok': False, 'msg': f'wallet2 indisponível: {e}'}), 500
     if not w2.turbofy_ok():
-        return jsonify({'ok': False, 'msg': 'Pagamentos indisponíveis: credenciais TURBOFY_CLIENT_ID/TURBOFY_SECRET não configuradas. Configure no .env (ou nas Variáveis do Discloud) e reinicie o bot.', 'code': 'WALLET2_SEM_CRED'}), 400
+        # Nunca expõe provedor/credencial pro cliente — só o nome do erro.
+        return jsonify({'ok': False, 'msg': 'Erro de depósito.'}), 400
     data = request.get_json(silent=True) or {}
     try:
         valor = float(str(data.get('valor', '')).replace(',', '.'))
@@ -1967,7 +1968,9 @@ def api_wallet2_depositar():
     cid = _wallet2_cid_logado()
     res = w2.criar_cobranca(cid, valor)
     if not res.get('ok'):
-        return jsonify({'ok': False, 'msg': res.get('erro')}), 502
+        # Loga o erro real no servidor, mas devolve genérico pro cliente.
+        print(f"[WALLET2] erro depósito: {res.get('erro')}", flush=True)
+        return jsonify({'ok': False, 'msg': 'Erro de depósito.'}), 502
     return jsonify({'ok': True, 'txid': res.get('txid'),
                     'copia_cola': res.get('copia_cola'), 'qr': res.get('qr')})
 
@@ -1988,7 +1991,8 @@ def api_wallet2_checar():
     cid = _wallet2_cid_logado()
     res = w2.checar_e_creditar(cid, txid)
     if not res.get('ok'):
-        return jsonify({'ok': False, 'msg': res.get('erro')}), 502
+        print(f"[WALLET2] erro checar: {res.get('erro')}", flush=True)
+        return jsonify({'ok': False, 'msg': 'Erro de depósito.'}), 502
     return jsonify({'ok': True, 'pago': res.get('pago', False),
                     'saldo': res.get('saldo')})
 
@@ -2004,7 +2008,8 @@ def api_wallet2_sacar():
     except Exception as e:
         return jsonify({'ok': False, 'msg': f'wallet2 indisponível: {e}'}), 500
     if not w2.turbofy_ok():
-        return jsonify({'ok': False, 'msg': 'Pagamentos indisponíveis: credenciais TURBOFY_CLIENT_ID/TURBOFY_SECRET não configuradas. Configure no .env (ou nas Variáveis do Discloud) e reinicie o bot.', 'code': 'WALLET2_SEM_CRED'}), 400
+        # Nunca expõe provedor/credencial pro cliente — só o nome do erro.
+        return jsonify({'ok': False, 'msg': 'Erro de saque.'}), 400
     data = request.get_json(silent=True) or {}
     try:
         valor = float(str(data.get('valor', '')).replace(',', '.'))
@@ -2021,7 +2026,8 @@ def api_wallet2_sacar():
                              recipient_name=str(data.get('nome') or ''),
                              recipient_doc=str(data.get('doc') or ''))
     if not res.get('ok'):
-        return jsonify({'ok': False, 'msg': res.get('erro'),
+        print(f"[WALLET2] erro saque: {res.get('erro')}", flush=True)
+        return jsonify({'ok': False, 'msg': 'Erro de saque.',
                         'estornado': res.get('estornado', False)}), 502
     return jsonify({'ok': True, 'batch_id': res.get('batch_id'),
                     'status': res.get('status'), 'saldo': res.get('saldo')})

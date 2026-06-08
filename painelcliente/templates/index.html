@@ -3953,31 +3953,12 @@ async function abrirDepositar(){
     });
     const d = await r.json();
     if (!d.ok){
-      if (d.code === 'WALLET2_SEM_CRED'){
-        // Aviso claro e acionável em vez do genérico "não configurada".
-        avisoWallet2SemCred();
-      } else {
-        toast(d.msg || 'Falha ao gerar PIX.', 'erro');
-      }
+      // Só o nome do erro — nunca detalhe de provedor/API.
+      toast(d.msg || 'Erro de depósito.', 'erro');
       return;
     }
     _w2MostrarPix(d.txid, d.copia_cola, d.qr, valor);
-  } catch(e){ toast('Erro de rede ao gerar PIX.', 'erro'); }
-}
-
-// Aviso amigável quando faltam as credenciais da Wallet2 (Turbofy).
-function avisoWallet2SemCred(){
-  toast('⚠️ Pagamentos ainda não configurados.', 'erro');
-  alert(
-    'Pagamentos indisponíveis 🔒\n\n' +
-    'As credenciais da carteira (TURBOFY_CLIENT_ID e TURBOFY_SECRET) não ' +
-    'estão configuradas neste servidor.\n\n' +
-    'Como resolver:\n' +
-    '1) Coloque TURBOFY_CLIENT_ID, TURBOFY_SECRET e TURBOFY_URL no arquivo .env\n' +
-    '   (ou nas Variáveis do painel Discloud).\n' +
-    '2) Reinicie o bot/app.\n\n' +
-    'Depois disso o depósito via PIX volta a funcionar.'
-  );
+  } catch(e){ toast('Erro de depósito.', 'erro'); }
 }
 
 function infoSaqueComando(){
@@ -4009,10 +3990,10 @@ async function abrirSacarWallet2(){
       body: JSON.stringify({valor, chave, tipo})
     });
     const d = await r.json();
-    if (!d.ok){ toast(d.msg || 'Falha no saque.', 'erro'); return; }
+    if (!d.ok){ toast(d.msg || 'Erro de saque.', 'erro'); return; }
     toast('Saque enviado! ✅', 'ok');
     if (typeof carregarWallet2 === 'function') carregarWallet2();
-  } catch(e){ toast('Erro de rede no saque.', 'erro'); }
+  } catch(e){ toast('Erro de saque.', 'erro'); }
 }
 
 function _w2MostrarPix(txid, copiaCola, qr, valor){
