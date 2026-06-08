@@ -2469,6 +2469,64 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
 .cmp-legal{ font-size:11px; color:var(--text4,#565667); margin-top:6px; }
 .cmp-copy{ width:100%; margin-top:18px; padding:14px; border:none; border-radius:15px; cursor:pointer; font-weight:700; font-size:14px; color:#fff; background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 12px 28px -12px rgba(124,58,237,0.9); }
 .cmp-copy:active{ transform:translateY(1px); }
+
+/* ── Bot: estado de processamento (feedback imediato + lock) ── */
+.btn-action.is-locked, .bots-quick-btn.is-locked{ opacity:0.5; cursor:not-allowed; pointer-events:none; filter:saturate(0.7); }
+.btn-action.is-loading, .bots-quick-btn.is-loading{
+  position:relative; opacity:1 !important;
+  box-shadow:0 0 0 1px rgba(168,85,247,0.45), 0 0 22px -4px rgba(168,85,247,0.8) !important;
+}
+.btn-action.is-loading::after, .bots-quick-btn.is-loading::after{
+  content:""; position:absolute; right:12px; top:50%; width:14px; height:14px; margin-top:-7px;
+  border:2px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%;
+  animation:fxspin .7s linear infinite;
+}
+/* pílula flutuante de progresso */
+.bot-proc{
+  position:fixed; left:50%; bottom:96px; transform:translate(-50%,16px);
+  z-index:2500; display:flex; align-items:center; gap:11px;
+  padding:13px 18px; border-radius:16px; max-width:90vw;
+  background:rgba(20,16,34,0.92); border:1px solid rgba(168,85,247,0.35);
+  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  box-shadow:0 16px 40px -14px rgba(124,58,237,0.8);
+  color:var(--text); font-size:13.5px; font-weight:600;
+  opacity:0; pointer-events:none; transition:opacity .22s, transform .22s;
+}
+.bot-proc.show{ opacity:1; transform:translate(-50%,0); }
+.bot-proc-spin{ width:18px; height:18px; flex:none; border:2.5px solid rgba(255,255,255,0.18); border-top-color:#c084fc; border-radius:50%; animation:fxspin .7s linear infinite; }
+.bot-proc-tx b{ color:#c4b5fd; font-family:'Space Grotesk',sans-serif; }
+@media (max-width:640px){ .bot-proc{ bottom:104px; } }
+
+/* ── Token do bot (troca manual) ── */
+.bots-token{
+  border-radius:22px; padding:18px; margin-top:2px;
+  border:1px solid var(--border); background:var(--card);
+  box-shadow:0 1px 0 0 rgba(255,255,255,0.06) inset, 0 18px 40px -28px rgba(0,0,0,0.8);
+  backdrop-filter:blur(22px) saturate(140%); -webkit-backdrop-filter:blur(22px) saturate(140%);
+}
+.bots-token-head{ display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+.bots-token-ico{ width:40px; height:40px; flex:none; border-radius:12px; display:grid; place-items:center; font-size:18px; background:rgba(251,191,36,0.14); border:1px solid rgba(251,191,36,0.3); }
+.bots-token-t{ font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; color:var(--text); }
+.bots-token-s{ font-size:12px; color:var(--text3); margin-top:3px; line-height:1.5; }
+.bots-token-badge{ flex:none; align-self:center; font-size:11px; font-weight:700; padding:5px 10px; border-radius:99px; color:var(--text3); background:rgba(255,255,255,0.06); border:1px solid var(--border); }
+.bots-token-badge.ok{ color:#6ee7b7; background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.3); }
+.bots-token-badge.err{ color:#fca5a5; background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.3); }
+.bots-token-badge.warn{ color:#fcd34d; background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.3); }
+.bots-token-field{ position:relative; display:flex; align-items:center; }
+.bots-token-input{
+  width:100%; padding:13px 44px 13px 14px; border-radius:13px; font-size:13.5px;
+  background:rgba(0,0,0,0.28); border:1px solid var(--border); color:var(--text);
+  font-family:'JetBrains Mono',monospace; letter-spacing:.3px;
+}
+.bots-token-input:focus{ outline:none; border-color:rgba(168,85,247,0.55); box-shadow:0 0 0 1px rgba(168,85,247,0.3); }
+.bots-token-eye{ position:absolute; right:8px; width:32px; height:32px; border:none; background:transparent; cursor:pointer; font-size:16px; opacity:.7; }
+.bots-token-save{
+  width:100%; margin-top:12px; padding:13px; border:none; border-radius:14px; cursor:pointer;
+  font-weight:700; font-size:14px; color:#fff; background:linear-gradient(135deg,#a855f7,#7c3aed);
+  box-shadow:0 12px 26px -12px rgba(124,58,237,0.9);
+}
+.bots-token-save:disabled{ opacity:.6; cursor:not-allowed; }
+.bots-token-warn{ font-size:11.5px; color:var(--text3); margin-top:10px; text-align:center; }
 </style>
 
 </head>
@@ -2586,9 +2644,13 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
         <span class="sidebar-item-ico">$</span>
         <span>Lucro</span>
       </a>
-      <a class="sidebar-item" data-view="carteira" id="nav-carteira" style="display:none;" onclick="navView('carteira')">
+      <a class="sidebar-item" data-view="carteira" id="nav-carteira" onclick="navView('carteira')">
         <span class="sidebar-item-ico">▢</span>
         <span>Carteira</span>
+      </a>
+      <a class="sidebar-item" data-view="bots" id="nav-bots" onclick="navView('bots')">
+        <span class="sidebar-item-ico">⊞</span>
+        <span>Bots</span>
       </a>
       <a class="sidebar-item" data-view="config" onclick="navView('config')">
         <span class="sidebar-item-ico">⚙</span>
@@ -3119,6 +3181,24 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
         <button class="bots-quick-btn stop" onclick="botAction('stop')"><span>■</span> Parar</button>
       </div>
 
+      <div class="bots-sec-title" style="margin-top:24px;">Token do bot</div>
+      <div class="bots-token">
+        <div class="bots-token-head">
+          <div class="bots-token-ico">🔑</div>
+          <div>
+            <div class="bots-token-t">Trocar token manualmente</div>
+            <div class="bots-token-s">Use quando o token do bot expirar ou for invalidado. Cole o novo token e salve — o bot reinicia com ele.</div>
+          </div>
+          <span class="bots-token-badge" id="bots-token-badge">—</span>
+        </div>
+        <div class="bots-token-field">
+          <input type="password" id="bots-token-input" class="bots-token-input" placeholder="Cole aqui o novo token do bot" autocomplete="off" spellcheck="false">
+          <button class="bots-token-eye" type="button" onclick="toggleTokenVisivel()" aria-label="Mostrar/ocultar">👁</button>
+        </div>
+        <button class="bots-token-save" onclick="salvarTokenBot()">Salvar novo token</button>
+        <div class="bots-token-warn">⚠️ Nunca compartilhe seu token. Quem tiver ele controla o bot.</div>
+      </div>
+
       <div class="bots-sec-title" style="margin-top:24px;">Configuração do bot</div>
       <div class="bots-config" id="bots-config-host">
         <div class="bots-cfg-empty">Carregando configurações…</div>
@@ -3329,7 +3409,7 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
       <span class="bottombar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></span>
       <span class="bottombar-lab">Stats</span>
     </a>
-    <a class="bottombar-item" data-view="carteira" id="bottom-carteira" style="display:none;" onclick="navView('carteira')">
+    <a class="bottombar-item" data-view="carteira" id="bottom-carteira" onclick="navView('carteira')">
       <span class="bottombar-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><circle cx="17" cy="14.5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
       <span class="bottombar-lab">Carteira</span>
     </a>
@@ -3659,6 +3739,16 @@ function carregarBots(){
     const atend = (parseInt(txt('ev-pagamentos'))||0) + (parseInt(txt('ev-gos'))||0) + (parseInt(txt('ev-msgs'))||0);
     set('bots-atend', atend + ' interações hoje');
 
+    // badge do estado do token (detectado pelos logs do bot)
+    const tb = document.getElementById('bots-token-badge');
+    if (tb){
+      const ts = (window.botTokenStatus && botTokenStatus.status) || (online ? 'ok' : '');
+      if (ts === 'invalid'){ tb.textContent = 'Expirado'; tb.className = 'bots-token-badge err'; }
+      else if (ts === 'captcha' || ts === 'rate_limit'){ tb.textContent = 'Atenção'; tb.className = 'bots-token-badge warn'; }
+      else if (ts === 'ok'){ tb.textContent = 'Válido'; tb.className = 'bots-token-badge ok'; }
+      else { tb.textContent = '—'; tb.className = 'bots-token-badge'; }
+    }
+
     // Traz a configuração do bot pra dentro da view Bots. Reaproveita o MESMO
     // nó DOM da página de config (ids/handlers intactos, sem duplicar) — só
     // muda de lugar uma vez. renderConfig() continua atualizando normalmente.
@@ -3671,6 +3761,43 @@ function carregarBots(){
     try { if (typeof renderConfig === 'function') renderConfig(); } catch(e) {}
   } catch(e) {}
 }
+// ── Troca manual do token do bot (DISCORD_TOKEN via /api/salvar-campo) ──
+function toggleTokenVisivel(){
+  const i = document.getElementById('bots-token-input');
+  if (i) i.type = (i.type === 'password' ? 'text' : 'password');
+}
+async function salvarTokenBot(){
+  const inp = document.getElementById('bots-token-input');
+  const token = (inp ? inp.value : '').trim();
+  if (!token){ toast('Cole o novo token primeiro.', 'err'); return; }
+  if (token.length < 50 || token.split('.').length < 3){
+    if (!confirm('Esse texto não parece um token de bot válido.\nSalvar mesmo assim?')) return;
+  }
+  const btn = document.querySelector('.bots-token-save');
+  if (btn){ btn.disabled = true; btn.textContent = 'Salvando…'; }
+  try {
+    const r = await fetch('/api/salvar-campo', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({campo: 'DISCORD_TOKEN', valor: token}),
+    });
+    const d = await r.json();
+    if (d.ok){
+      toast('✓ Token atualizado. Reiniciando o bot com o novo token…', 'ok');
+      if (inp) inp.value = '';
+      const badge = document.getElementById('bots-token-badge');
+      if (badge){ badge.textContent = 'Atualizado'; badge.className = 'bots-token-badge ok'; }
+      // aplica reiniciando (reusa a mesma lógica com feedback/cooldown)
+      if (!d.aplicado){ setTimeout(()=>{ try{ botAction('restart'); }catch(e){} }, 400); }
+    } else {
+      toast(d.msg || 'Falha ao salvar o token.', 'err');
+    }
+  } catch(e){
+    toast('Erro de rede ao salvar o token.', 'err');
+  } finally {
+    if (btn){ btn.disabled = false; btn.textContent = 'Salvar novo token'; }
+  }
+}
+
 // Toggle do bot a partir da view Bots → reaproveita botAction()
 function botsToggle(){
   const card = document.getElementById('bots-main-card');
@@ -4720,10 +4847,12 @@ async function carregarDados() {
         const rw2 = await fetch('/api/wallet2');
         if (rw2.ok) { const dw2 = await rw2.json(); if (dw2.ativo) mostrar = true; }
       } catch (e) {}
+      // Carteira sempre visível no menu (pedido) — mesmo que a API ainda não
+      // tenha respondido 'ativo'. A própria view mostra o estado real dentro.
       const nc = document.getElementById('nav-carteira');
-      if (nc) nc.style.display = mostrar ? '' : 'none';
+      if (nc) nc.style.display = '';
       const bc = document.getElementById('bottom-carteira');
-      if (bc) bc.style.display = mostrar ? '' : 'none';
+      if (bc) bc.style.display = '';
     } catch (e) {}
   })();
 
@@ -5056,16 +5185,68 @@ async function checarStatusBot() {
   } catch {}
 }
 
+// Estado global da ação do bot — evita cliques concorrentes e dá feedback
+// imediato (o clique antes parecia que "não fazia nada" até a resposta vir).
+let _botBusy = false;
+let _botCooldownTimer = null;
+function _todosBotoesBot(){ return document.querySelectorAll('.btn-action, .bots-quick-btn'); }
+function _travarBotoesBot(travar){
+  _todosBotoesBot().forEach(b => { b.disabled = travar; b.classList.toggle('is-locked', travar); });
+}
+function _botProcShow(msg, segs){
+  let el = document.getElementById('bot-proc');
+  if (!el){ el = document.createElement('div'); el.id = 'bot-proc'; el.className = 'bot-proc'; document.body.appendChild(el); }
+  el.innerHTML = `<span class="bot-proc-spin"></span><span class="bot-proc-tx">${msg} <b id="bot-proc-sec">${segs}s</b></span>`;
+  requestAnimationFrame(()=> el.classList.add('show'));
+  const s1 = document.getElementById('bot-status-txt'); if (s1) s1.textContent = msg;
+  const s2 = document.getElementById('bots-bot-status'); if (s2) s2.textContent = 'Processando…';
+}
+function _botProcSec(s){ const e = document.getElementById('bot-proc-sec'); if (e) e.textContent = s + 's'; }
+function _botProcHide(){ const el = document.getElementById('bot-proc'); if (el) el.classList.remove('show'); }
+
 async function botAction(action) {
-  const buttons = document.querySelectorAll('.btn-action');
-  buttons.forEach(b => b.disabled = true);
-  const r = await fetch(`/api/bot/${action}`, {method:'POST'});
-  const d = await r.json();
-  toast(d.msg || (d.ok ? 'Ok' : 'Erro'), d.ok ? 'ok' : 'err');
-  setTimeout(() => {
-    buttons.forEach(b => b.disabled = false);
-    checarStatusBot();
-  }, 1500);
+  // Se já tem uma ação rodando, avisa e bloqueia (pedido).
+  if (_botBusy){
+    toast('⏳ O bot já está processando uma ação. Aguarde terminar.', 'err');
+    return;
+  }
+  const VERBO = { start:'sendo iniciado', restart:'sendo reiniciado', stop:'sendo parado' };
+  const ESPERA = { start:8, restart:10, stop:4 };          // segundos estimados
+  const verbo = VERBO[action] || 'processando';
+  let segs = ESPERA[action] || 6;
+
+  _botBusy = true;
+  // 1) FEEDBACK IMEDIATO no próprio clique (antes de qualquer await)
+  _travarBotoesBot(true);
+  const alvo = (window.event && (window.event.currentTarget || window.event.target));
+  if (alvo && alvo.classList){ const btn = alvo.closest('.btn-action, .bots-quick-btn'); if (btn) btn.classList.add('is-loading'); }
+  _botProcShow(`⏳ Bot ${verbo}… aguarde`, segs);
+
+  // 2) Dispara a ação
+  try {
+    const r = await fetch(`/api/bot/${action}`, {method:'POST'});
+    const d = await r.json();
+    if (d && d.msg) toast(d.msg, d.ok ? 'ok' : 'err');
+  } catch(e){
+    toast('Erro de rede ao falar com o bot.', 'err');
+  }
+
+  // 3) Cooldown com contagem regressiva visível; só libera no fim
+  if (_botCooldownTimer) clearInterval(_botCooldownTimer);
+  _botCooldownTimer = setInterval(() => {
+    segs -= 1;
+    if (segs <= 0){
+      clearInterval(_botCooldownTimer);
+      _botProcHide();
+      _travarBotoesBot(false);
+      _todosBotoesBot().forEach(b => b.classList.remove('is-loading'));
+      _botBusy = false;
+      try { checarStatusBot(); } catch(e){}
+      try { if (typeof carregarBots === 'function') carregarBots(); } catch(e){}
+    } else {
+      _botProcSec(segs);
+    }
+  }, 1000);
 }
 
 function abrirSuporte() {
