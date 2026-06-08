@@ -2214,6 +2214,8 @@ def api_dados():
             {'guild': str(s.get('guild', '')), 'canal': str(s.get('canal', ''))}
             for s in (doc.get('servidores_extra') or []) if isinstance(s, dict)
         ] if doc else [],
+        # Servidores/canais/categorias REPORTADOS pelo bot (pro seletor por nome).
+        'discord_servers': (doc.get('discord_servers') or []) if doc else [],
         'from_env': False,
     })
 

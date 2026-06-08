@@ -3830,26 +3830,71 @@ async function salvarTokenBot(){
 // Slot 1 = principal (GUILD_IDS / FORUM_CHANNEL_IDS / CATEGORIA_ID, salvos via
 // /api/salvar-campo). Slots 2..N = servidores_extra [{guild, canal}], salvos via
 // /api/servidor-extra. N = servidores_permitidos.
+function _serversList(){ return dados.discord_servers || []; }
+function _serverByGuild(gid){ return _serversList().find(s => String(s.guild_id) === String(gid)) || null; }
+// Monta as <option> de um select garantindo que o valor salvo apareça mesmo
+// que não esteja na lista reportada (ex: canal antigo / bot ainda não reportou).
+function _opts(items, selected, vazioLabel){
+  let out = `<option value="">${vazioLabel}</option>`;
+  let achou = false;
+  (items||[]).forEach(it => {
+    const sel = String(it.id) === String(selected) ? ' selected' : '';
+    if (sel) achou = true;
+    out += `<option value="${_esc(it.id)}"${sel}>${_esc(it.name||it.id)}</option>`;
+  });
+  if (selected && !achou){
+    out += `<option value="${_esc(selected)}" selected>ID ${_esc(selected)} (atual)</option>`;
+  }
+  return out;
+}
 function renderServidores(){
   const host = document.getElementById('bots-servidores');
   if (!host) return;
   const permitidos = Math.max(1, parseInt(dados.servidores_permitidos) || 1);
   const extras = dados.servidores_extra || [];
+  const servers = _serversList();
+  const temLista = servers.length > 0;
   const cnt = document.getElementById('bots-srv-count');
   if (cnt) cnt.textContent = `${permitidos} permitido${permitidos>1?'s':''}`;
   let html = '';
   for (let slot = 1; slot <= permitidos; slot++){
-    let guild = '', canal = '', categoria = '', principal = (slot === 1);
+    const principal = (slot === 1);
+    let guild = '', canal = '', categoria = '';
     if (principal){
-      guild = cfg.GUILD_IDS || '';
-      canal = cfg.FORUM_CHANNEL_IDS || '';
+      guild = (cfg.GUILD_IDS || '').split(/[ ,\n]+/)[0] || '';
+      canal = (cfg.FORUM_CHANNEL_IDS || '').split(/[ ,\n]+/)[0] || '';
       categoria = cfg.CATEGORIA_ID || '';
     } else {
       const e = extras[slot - 2] || {};
       guild = e.guild || ''; canal = e.canal || '';
     }
+    const srv = _serverByGuild(guild);
+    const nomeServidor = srv ? srv.guild_name : (guild ? ('Servidor ' + guild) : '');
     const configurado = !!guild;
-    const sub = configurado ? `Servidor ${_esc(guild)}` : 'Não configurado — toque pra definir';
+    const sub = configurado ? _esc(nomeServidor) : 'Não configurado — toque pra definir';
+
+    // Campos: SELECT (por nome) quando o bot reportou; senão input de ID.
+    let campoGuild, campoCanal, campoCat = '';
+    if (temLista){
+      campoGuild = `<select class="srv-inp" id="srv-guild-${slot}" onchange="popularCanais(${slot})">
+        ${_opts(servers.map(s=>({id:s.guild_id,name:s.guild_name})), guild, 'Selecione o servidor')}
+      </select>`;
+      const canais = srv ? srv.canais : [];
+      campoCanal = `<select class="srv-inp" id="srv-canal-${slot}">${_opts(canais, canal, 'Selecione o canal')}</select>`;
+      if (principal){
+        const cats = srv ? srv.categorias : [];
+        campoCat = `<label class="srv-lbl">Categoria (opcional)</label>
+          <select class="srv-inp" id="srv-cat-${slot}">${_opts(cats, categoria, 'Sem categoria')}</select>`;
+      }
+    } else {
+      campoGuild = `<input class="srv-inp" id="srv-guild-${slot}" inputmode="numeric" placeholder="ID do servidor" value="${_esc(guild)}">`;
+      campoCanal = `<input class="srv-inp" id="srv-canal-${slot}" inputmode="numeric" placeholder="ID do canal da fila" value="${_esc(canal)}">`;
+      if (principal){
+        campoCat = `<label class="srv-lbl">Categoria (opcional)</label>
+          <input class="srv-inp" id="srv-cat-${slot}" inputmode="numeric" placeholder="ID da categoria" value="${_esc(categoria)}">`;
+      }
+    }
+
     html += `
       <div class="srv-card ${configurado?'':'vazio'}" id="srv-card-${slot}">
         <div class="srv-head" onclick="toggleServidor(${slot})">
@@ -3861,19 +3906,29 @@ function renderServidores(){
           <div class="srv-arrow">›</div>
         </div>
         <div class="srv-body" id="srv-body-${slot}">
-          <label class="srv-lbl">ID do servidor (guild)</label>
-          <input class="srv-inp" id="srv-guild-${slot}" inputmode="numeric" placeholder="Ex: 1293555181547683923" value="${_esc(guild)}">
+          <label class="srv-lbl">Servidor</label>
+          ${campoGuild}
           <label class="srv-lbl">Canal onde cai a fila</label>
-          <input class="srv-inp" id="srv-canal-${slot}" inputmode="numeric" placeholder="ID do canal (ou categoria) da fila" value="${_esc(canal)}">
-          ${principal ? `
-          <label class="srv-lbl">Categoria (opcional)</label>
-          <input class="srv-inp" id="srv-cat-${slot}" inputmode="numeric" placeholder="ID da categoria" value="${_esc(categoria)}">` : ''}
+          ${campoCanal}
+          ${campoCat}
           <button class="srv-save" onclick="salvarServidor(${slot}, ${principal})">Salvar servidor ${slot}</button>
-          <div class="srv-help">Pra pegar o ID: ative o Modo Desenvolvedor no Discord → clique direito no servidor/canal → Copiar ID.</div>
+          <div class="srv-help">${temLista
+            ? 'Lista carregada do seu bot. Se faltar algum canal, inicie/reinicie o bot pra atualizar.'
+            : 'Inicie o bot uma vez pra listar seus servidores e canais por nome. Por enquanto, cole os IDs (Modo Desenvolvedor → clique direito → Copiar ID).'}</div>
         </div>
       </div>`;
   }
   host.innerHTML = html;
+}
+// Ao trocar o servidor no select, repopula os canais/categorias daquele servidor.
+function popularCanais(slot){
+  const gsel = document.getElementById('srv-guild-'+slot);
+  if (!gsel) return;
+  const srv = _serverByGuild(gsel.value);
+  const csel = document.getElementById('srv-canal-'+slot);
+  if (csel) csel.innerHTML = _opts(srv ? srv.canais : [], '', 'Selecione o canal');
+  const catsel = document.getElementById('srv-cat-'+slot);
+  if (catsel) catsel.innerHTML = _opts(srv ? srv.categorias : [], '', 'Sem categoria');
 }
 function toggleServidor(slot){
   const card = document.getElementById('srv-card-'+slot);
