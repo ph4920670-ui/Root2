@@ -3790,6 +3790,10 @@ function carregarBots(){
     }
     try { if (typeof renderConfig === 'function') renderConfig(); } catch(e) {}
     try { renderServidores(); } catch(e) {}
+    // Auto-busca os servidores no Discord 1x (pra já vir por nome, sem clicar).
+    try {
+      if (!window._srvAutoTried){ window._srvAutoTried = true; setTimeout(()=>atualizarServidores(null), 300); }
+    } catch(e) {}
   } catch(e) {}
 }
 // ── Troca manual do token do bot (DISCORD_TOKEN via /api/salvar-campo) ──
@@ -3833,24 +3837,51 @@ async function salvarTokenBot(){
 // Slot 1 = principal (GUILD_IDS / FORUM_CHANNEL_IDS / CATEGORIA_ID, salvos via
 // /api/salvar-campo). Slots 2..N = servidores_extra [{guild, canal}], salvos via
 // /api/servidor-extra. N = servidores_permitidos.
-// Recarrega a lista de servidores reportada pelo bot (depois que ele subiu com
-// o código novo e reportou). Atualiza dados.discord_servers e re-renderiza.
+// Recarrega a lista de servidores DIRETO da API do Discord (usa o token do
+// cliente — não depende do bot reportar). Busca os guilds e, pros servidores já
+// configurados, busca os canais pra mostrar por nome.
 async function atualizarServidores(btn){
-  if (btn){ btn.disabled = true; btn.textContent = '🔄 Atualizando…'; }
+  if (btn){ btn.disabled = true; btn.textContent = '🔄 Buscando no Discord…'; }
   try {
-    const r = await fetch('/api/dados');
-    if (r.ok){
-      const d = await r.json();
-      dados.discord_servers = d.discord_servers || [];
-      dados.servidores_permitidos = d.servidores_permitidos || dados.servidores_permitidos;
-      dados.servidores_extra = d.servidores_extra || dados.servidores_extra;
-      if (d.config) cfg = d.config;
-      renderServidores();
-      const n = (dados.discord_servers || []).length;
-      toast(n ? `✓ ${n} servidor(es) carregado(s) do bot.` : 'O bot ainda não reportou. Inicie/reinicie o bot.', n ? 'ok' : 'erro');
+    const r = await fetch('/api/discord-guilds');
+    const d = await r.json();
+    if (!d.ok){
+      toast(d.msg === 'sem token' ? 'Configure o token do bot primeiro.' : 'Não consegui falar com o Discord (token inválido?).', 'erro');
+      return;
     }
-  } catch(e){ toast('Erro ao atualizar.', 'erro'); }
+    // guilds sem canais ainda (canais são lazy, ao escolher o servidor)
+    const antigos = {};
+    (dados.discord_servers||[]).forEach(s => { antigos[s.guild_id] = s; });
+    dados.discord_servers = (d.guilds||[]).map(g => ({
+      guild_id: g.guild_id, guild_name: g.guild_name,
+      canais: (antigos[g.guild_id]||{}).canais || [],
+      categorias: (antigos[g.guild_id]||{}).categorias || [],
+    }));
+    renderServidores();
+    // pré-carrega os canais dos servidores JÁ configurados (pra mostrar o nome)
+    const configurados = new Set();
+    const pg = (cfg.GUILD_IDS||'').split(/[ ,\n]+/)[0]; if (pg) configurados.add(pg);
+    (dados.servidores_extra||[]).forEach(e => { if (e.guild) configurados.add(e.guild); });
+    for (const gid of configurados){ await _fetchCanais(gid); }
+    renderServidores();
+    toast(`✓ ${(d.guilds||[]).length} servidor(es) carregado(s) do Discord.`, 'ok');
+  } catch(e){ toast('Erro ao buscar no Discord.', 'erro'); }
   finally { if (btn){ btn.disabled = false; btn.textContent = '🔄 Atualizar lista do bot'; } }
+}
+// Busca os canais/categorias de um guild e guarda em dados.discord_servers.
+async function _fetchCanais(guildId){
+  if (!guildId) return null;
+  let srv = _serverByGuild(guildId);
+  if (srv && srv.canais && srv.canais.length) return srv;  // já tem
+  try {
+    const r = await fetch('/api/discord-canais?guild=' + encodeURIComponent(guildId));
+    const d = await r.json();
+    if (!d.ok) return srv;
+    if (!srv){ srv = {guild_id: String(guildId), guild_name: 'Servidor ' + guildId, canais: [], categorias: []};
+               dados.discord_servers = dados.discord_servers || []; dados.discord_servers.push(srv); }
+    srv.canais = d.canais || []; srv.categorias = d.categorias || [];
+    return srv;
+  } catch(e){ return srv; }
 }
 function _serversList(){ return dados.discord_servers || []; }
 function _serverByGuild(gid){ return _serversList().find(s => String(s.guild_id) === String(gid)) || null; }
@@ -3937,21 +3968,23 @@ function renderServidores(){
           ${campoCat}
           <button class="srv-save" onclick="salvarServidor(${slot}, ${principal})">Salvar servidor ${slot}</button>
           <div class="srv-help">${temLista
-            ? 'Lista carregada do seu bot. Se faltar algum canal, inicie/reinicie o bot pra atualizar.'
-            : 'Inicie o bot uma vez pra listar seus servidores e canais por nome. Por enquanto, cole os IDs (Modo Desenvolvedor → clique direito → Copiar ID).'}</div>
+            ? 'Lista carregada do Discord. Se faltar algo, toque em "Atualizar lista".'
+            : 'Carregando seus servidores do Discord… Se não aparecer, toque em "Atualizar lista" (precisa o token do bot configurado).'}</div>
         </div>
       </div>`;
   }
   host.innerHTML = html;
 }
-// Ao trocar o servidor no select, repopula os canais/categorias daquele servidor.
-function popularCanais(slot){
+// Ao trocar o servidor no select, busca (lazy) os canais/categorias daquele
+// servidor no Discord e repopula os selects.
+async function popularCanais(slot){
   const gsel = document.getElementById('srv-guild-'+slot);
   if (!gsel) return;
-  const srv = _serverByGuild(gsel.value);
   const csel = document.getElementById('srv-canal-'+slot);
-  if (csel) csel.innerHTML = _opts(srv ? srv.canais : [], '', 'Selecione o canal');
   const catsel = document.getElementById('srv-cat-'+slot);
+  if (csel) csel.innerHTML = '<option value="">Carregando…</option>';
+  const srv = await _fetchCanais(gsel.value);
+  if (csel) csel.innerHTML = _opts(srv ? srv.canais : [], '', 'Selecione o canal');
   if (catsel) catsel.innerHTML = _opts(srv ? srv.categorias : [], '', 'Sem categoria');
 }
 function toggleServidor(slot){

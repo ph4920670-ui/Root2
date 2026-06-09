@@ -2235,6 +2235,64 @@ def _doc_cliente_logado():
     return doc
 
 
+DISCORD_API = 'https://discord.com/api/v9'
+
+def _token_cliente_logado():
+    doc = _doc_cliente_logado()
+    return (((doc or {}).get('variaveis') or {}).get('DISCORD_TOKEN') or '').strip()
+
+@app.route('/api/discord-guilds')
+def api_discord_guilds():
+    """Lista os servidores do cliente direto da API do Discord, usando o token
+    dele (que já está no doc). Assim o seletor por NOME funciona sem depender do
+    bot reportar nada."""
+    if not session.get('logado'):
+        return jsonify({'ok': False}), 401
+    token = _token_cliente_logado()
+    if not token:
+        return jsonify({'ok': False, 'msg': 'sem token'}), 400
+    try:
+        r = requests.get(f'{DISCORD_API}/users/@me/guilds',
+                         headers={'Authorization': token}, timeout=12)
+        if r.status_code != 200:
+            return jsonify({'ok': False, 'msg': f'discord {r.status_code}'}), 502
+        gs = r.json() if isinstance(r.json(), list) else []
+        out = [{'guild_id': str(g.get('id', '')), 'guild_name': g.get('name', '')}
+               for g in gs if g.get('id')]
+        return jsonify({'ok': True, 'guilds': out})
+    except Exception as e:
+        print(f"[DISCORD-GUILDS] erro: {e}", flush=True)
+        return jsonify({'ok': False, 'msg': 'erro ao consultar Discord'}), 502
+
+@app.route('/api/discord-canais')
+def api_discord_canais():
+    """Canais + categorias de UM servidor (lazy, quando o cliente escolhe o
+    servidor no seletor). Usa o token do cliente."""
+    if not session.get('logado'):
+        return jsonify({'ok': False}), 401
+    guild = ''.join(c for c in (request.args.get('guild') or '') if c.isdigit())
+    if not guild:
+        return jsonify({'ok': False, 'msg': 'guild inválido'}), 400
+    token = _token_cliente_logado()
+    if not token:
+        return jsonify({'ok': False, 'msg': 'sem token'}), 400
+    try:
+        r = requests.get(f'{DISCORD_API}/guilds/{guild}/channels',
+                         headers={'Authorization': token}, timeout=12)
+        if r.status_code != 200:
+            return jsonify({'ok': False, 'msg': f'discord {r.status_code}'}), 502
+        chs = r.json() if isinstance(r.json(), list) else []
+        # type: 0=texto, 5=anúncio, 15=fórum (canais onde cai fila) | 4=categoria
+        canais = [{'id': str(c.get('id', '')), 'name': c.get('name', '')}
+                  for c in chs if c.get('type') in (0, 5, 15)]
+        cats = [{'id': str(c.get('id', '')), 'name': c.get('name', '')}
+                for c in chs if c.get('type') == 4]
+        return jsonify({'ok': True, 'canais': canais, 'categorias': cats})
+    except Exception as e:
+        print(f"[DISCORD-CANAIS] erro: {e}", flush=True)
+        return jsonify({'ok': False, 'msg': 'erro ao consultar Discord'}), 502
+
+
 @app.route('/api/servidor-extra', methods=['POST'])
 def api_servidor_extra():
     """Salva um servidor EXTRA (slot 2..N) onde a fila cai. Body: {slot, guild,
