@@ -2422,6 +2422,10 @@ img{ -webkit-user-drag:none; user-drag:none; pointer-events:auto; }
 .srv-lbl{ display:block; font-size:11.5px; font-weight:600; color:var(--text2); margin:10px 0 5px; }
 .srv-inp{ width:100%; padding:11px 13px; border-radius:11px; font-size:13px; background:rgba(0,0,0,0.28); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; }
 .srv-inp:focus{ outline:none; border-color:rgba(168,85,247,0.55); box-shadow:0 0 0 1px rgba(168,85,247,0.3); }
+.srv-canal-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.srv-canal-row .srv-inp{ flex:1; min-width:0; }
+.srv-del{ flex:none; width:34px; height:38px; border-radius:10px; border:1px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.1); color:#fca5a5; font-size:18px; cursor:pointer; line-height:1; }
+.srv-addcanal{ margin-top:2px; padding:8px 12px; border-radius:10px; cursor:pointer; font-size:12.5px; font-weight:600; color:#c4b5fd; background:rgba(168,85,247,0.1); border:1px dashed rgba(168,85,247,0.4); }
 .srv-save{ width:100%; margin-top:12px; padding:12px; border:none; border-radius:12px; cursor:pointer; font-weight:700; font-size:13.5px; color:#fff; background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 12px 26px -12px rgba(124,58,237,0.9); }
 .srv-save:disabled{ opacity:.6; cursor:not-allowed; }
 .srv-help{ font-size:11px; color:var(--text3); margin-top:9px; line-height:1.5; }
@@ -3912,15 +3916,17 @@ function renderServidores(){
   let html = '';
   for (let slot = 1; slot <= permitidos; slot++){
     const principal = (slot === 1);
-    let guild = '', canal = '', categoria = '';
+    let guild = '', canaisSel = [], categoria = '';
     if (principal){
       guild = (cfg.GUILD_IDS || '').split(/[ ,\n]+/)[0] || '';
-      canal = (cfg.FORUM_CHANNEL_IDS || '').split(/[ ,\n]+/)[0] || '';
+      canaisSel = (cfg.FORUM_CHANNEL_IDS || '').split(/[ ,\n]+/).filter(Boolean);
       categoria = cfg.CATEGORIA_ID || '';
     } else {
       const e = extras[slot - 2] || {};
-      guild = e.guild || ''; canal = e.canal || '';
+      guild = e.guild || '';
+      canaisSel = (e.canal || '').split(/[ ,\n]+/).filter(Boolean);
     }
+    if (!canaisSel.length) canaisSel = [''];
     const srv = _serverByGuild(guild);
     const nomeServidor = srv ? srv.guild_name : '';
     const configurado = !!guild;
@@ -3928,27 +3934,35 @@ function renderServidores(){
       ? _esc(nomeServidor)
       : (configurado ? 'Configurado — toque pra editar' : 'Não configurado — toque pra definir');
 
-    // Campos: SELECT (por nome) quando o bot reportou; senão input de ID.
-    let campoGuild, campoCanal, campoCat = '';
+    // Campos: SELECT (por nome) quando há lista; senão input de ID. Canal aceita
+    // VÁRIOS (a fila pode cair em mais de um canal) — botão "+ Adicionar canal".
+    const canais = srv ? srv.canais : [];
+    const cats = srv ? srv.categorias : [];
+    const linhaCanal = (cid, i) => {
+      const campo = temLista
+        ? `<select class="srv-inp srv-canal" data-slot="${slot}">${_opts(canais, cid, 'Selecione o canal')}</select>`
+        : `<input class="srv-inp srv-canal" data-slot="${slot}" inputmode="numeric" placeholder="ID do canal da fila" value="${_esc(cid)}">`;
+      const del = i > 0 ? `<button type="button" class="srv-del" onclick="this.closest('.srv-canal-row').remove()">×</button>` : '';
+      return `<div class="srv-canal-row">${campo}${del}</div>`;
+    };
+    let campoGuild, campoCat = '';
     if (temLista){
       campoGuild = `<select class="srv-inp" id="srv-guild-${slot}" onchange="popularCanais(${slot})">
         ${_opts(servers.map(s=>({id:s.guild_id,name:s.guild_name})), guild, 'Selecione o servidor')}
       </select>`;
-      const canais = srv ? srv.canais : [];
-      campoCanal = `<select class="srv-inp" id="srv-canal-${slot}">${_opts(canais, canal, 'Selecione o canal')}</select>`;
       if (principal){
-        const cats = srv ? srv.categorias : [];
         campoCat = `<label class="srv-lbl">Categoria (opcional)</label>
           <select class="srv-inp" id="srv-cat-${slot}">${_opts(cats, categoria, 'Sem categoria')}</select>`;
       }
     } else {
       campoGuild = `<input class="srv-inp" id="srv-guild-${slot}" inputmode="numeric" placeholder="ID do servidor" value="${_esc(guild)}">`;
-      campoCanal = `<input class="srv-inp" id="srv-canal-${slot}" inputmode="numeric" placeholder="ID do canal da fila" value="${_esc(canal)}">`;
       if (principal){
         campoCat = `<label class="srv-lbl">Categoria (opcional)</label>
           <input class="srv-inp" id="srv-cat-${slot}" inputmode="numeric" placeholder="ID da categoria" value="${_esc(categoria)}">`;
       }
     }
+    const campoCanal = `<div id="srv-canais-${slot}">${canaisSel.map(linhaCanal).join('')}</div>
+      <button type="button" class="srv-addcanal" onclick="addCanal(${slot})">+ Adicionar canal</button>`;
 
     html += `
       <div class="srv-card ${configurado?'':'vazio'}" id="srv-card-${slot}">
@@ -3976,16 +3990,46 @@ function renderServidores(){
   host.innerHTML = html;
 }
 // Ao trocar o servidor no select, busca (lazy) os canais/categorias daquele
-// servidor no Discord e repopula os selects.
+// servidor no Discord e repopula TODOS os selects de canal do slot + categoria.
 async function popularCanais(slot){
   const gsel = document.getElementById('srv-guild-'+slot);
   if (!gsel) return;
-  const csel = document.getElementById('srv-canal-'+slot);
+  const host = document.getElementById('srv-canais-'+slot);
   const catsel = document.getElementById('srv-cat-'+slot);
-  if (csel) csel.innerHTML = '<option value="">Carregando…</option>';
+  if (host) host.querySelectorAll('.srv-canal').forEach(s => { s.innerHTML = '<option value="">Carregando…</option>'; });
   const srv = await _fetchCanais(gsel.value);
-  if (csel) csel.innerHTML = _opts(srv ? srv.canais : [], '', 'Selecione o canal');
+  const canais = srv ? srv.canais : [];
+  if (host){
+    // mantém só 1 linha (reset) ao trocar de servidor
+    host.innerHTML = `<div class="srv-canal-row"><select class="srv-inp srv-canal" data-slot="${slot}">${_opts(canais, '', 'Selecione o canal')}</select></div>`;
+  }
   if (catsel) catsel.innerHTML = _opts(srv ? srv.categorias : [], '', 'Sem categoria');
+}
+// Adiciona mais um seletor de canal no slot (a fila pode cair em vários canais).
+function addCanal(slot){
+  const host = document.getElementById('srv-canais-'+slot);
+  if (!host) return;
+  const gsel = document.getElementById('srv-guild-'+slot);
+  const srv = gsel ? _serverByGuild(gsel.value) : null;
+  const temLista = !!(srv && srv.canais && srv.canais.length);
+  const campo = temLista
+    ? `<select class="srv-inp srv-canal" data-slot="${slot}">${_opts(srv.canais, '', 'Selecione o canal')}</select>`
+    : `<input class="srv-inp srv-canal" data-slot="${slot}" inputmode="numeric" placeholder="ID do canal da fila" value="">`;
+  const row = document.createElement('div');
+  row.className = 'srv-canal-row';
+  row.innerHTML = campo + `<button type="button" class="srv-del" onclick="this.closest('.srv-canal-row').remove()">×</button>`;
+  host.appendChild(row);
+}
+// Coleta todos os canais escolhidos no slot (sem vazios, sem repetir).
+function _coletarCanais(slot){
+  const host = document.getElementById('srv-canais-'+slot);
+  if (!host) return '';
+  const vals = [];
+  host.querySelectorAll('.srv-canal').forEach(el => {
+    const v = (el.value || '').trim();
+    if (v && !vals.includes(v)) vals.push(v);
+  });
+  return vals.join(',');
 }
 function toggleServidor(slot){
   const card = document.getElementById('srv-card-'+slot);
@@ -3994,7 +4038,7 @@ function toggleServidor(slot){
 async function salvarServidor(slot, principal){
   const val = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
   const guild = val('srv-guild-'+slot);
-  const canal = val('srv-canal-'+slot);
+  const canal = _coletarCanais(slot);   // 1 ou vários canais, separados por vírgula
   if (!guild){ toast('Informe o ID do servidor.', 'erro'); return; }
   const btn = document.querySelector(`#srv-body-${slot} .srv-save`);
   if (btn){ btn.disabled = true; btn.textContent = 'Salvando…'; }
