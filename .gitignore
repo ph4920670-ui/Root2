@@ -29,3 +29,12 @@ game28.dta
 
 # Log files
 warnings.log
+
+# Secrets / credentials
+.env
+*.pem
+keys_backup.json
+data/.pix_creds_key
+cert.pem
+*.crt
+configadm/
