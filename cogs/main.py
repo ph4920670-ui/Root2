@@ -4792,41 +4792,60 @@ class SalaV2Cog(commands.Cog):
                     if disabled: bb["disabled"] = True
                     if emoji: bb["emoji"] = emoji
                     return bb
+                def _bdiv(i, sp=1): return {"id": i, "type": 14, "divider": True, "spacing": sp}
 
-                cab = (
-                    f"## {e('presente')} Painel de Bônus — {inter.user.display_name}\n"
-                    f"-# 💸 Resgate automático ativo — suas salas bônus caem direto no saldo!"
-                )
-                comps = [{"id": 2, "type": 10, "content": cab}]
+                tem = b["total_comprado"] > 0
 
-                if b["total_comprado"] == 0:
-                    comps.append({"id": 3, "type": 10, "content": (
-                        f"{OFF} Você ainda **não comprou salas**.\n"
-                        f"{DOT} A cada **{_br3} salas** compradas = **+{_bpc3} sala(s) grátis** automáticas!"
-                    )})
-                else:
-                    comps += [
-                        _bsec(3,  f"{CART} **Total Comprado**\nSalas compradas acumuladas na faixa.",
-                                  _bbtn(5,  f"{b['total_comprado']} salas",   "bn:total",  disabled=True, emoji=_em("carteira"))),
-                        _bsec(6,  f"{PRESENTE} **Bônus Recebido**\nSalas grátis já creditadas no saldo.",
-                                  _bbtn(8,  f"{b['bonus_resgatado']} salas",  "bn:recebido", disabled=True, emoji=_em("presente"))),
-                        {"id": 9, "type": 14, "divider": True, "spacing": 1},
-                    ]
+                # ── Cabeçalho com avatar (thumbnail) ──
+                comps = [
+                    {"id": 2, "type": 9,
+                     "components": [{"id": 3, "type": 10, "content": (
+                        f"## {e('presente')}  Painel de Bônus\n"
+                        f"**{inter.user.display_name}**\n"
+                        f"-# {e('on')} Resgate automático ativo — seu bônus cai direto no saldo!"
+                     )}],
+                     "accessory": {"id": 4, "type": 11, "media": {"url": inter.user.display_avatar.url}}},
+                    _bdiv(5),
+                ]
 
-                # Linha de ganhos por período (botões disabled — só pra mostrar)
-                comps.append({"id": 10, "type": 1, "components": [
-                    {"id": 11, "type": 2, "style": 3, "label": f"24h: +{ganho['dia']}",      "custom_id": "bn:dia",    "disabled": True, "emoji": _em("clock")},
-                    {"id": 12, "type": 2, "style": 1, "label": f"Semana: +{ganho['semana']}", "custom_id": "bn:semana", "disabled": True, "emoji": _em("calendario")},
-                    {"id": 13, "type": 2, "style": 2, "label": f"Total: +{ganho['total']}",   "custom_id": "bn:total2", "disabled": True, "emoji": _em("stats")},
+                # ── Sua Faixa (status em botões) ──
+                comps.append({"id": 6, "type": 10, "content": f"### {e('stats')}  Sua Faixa"})
+                comps.append({"id": 7, "type": 1, "components": [
+                    {"id": 8,  "type": 2, "style": 2, "label": f"Comprado: {b['total_comprado']}", "custom_id": "bn:total",    "disabled": True, "emoji": _em("carteira")},
+                    {"id": 9,  "type": 2, "style": 3, "label": f"Bônus: {b['bonus_resgatado']}",   "custom_id": "bn:recebido", "disabled": True, "emoji": _em("presente")},
+                    {"id": 10, "type": 2, "style": 1, "label": f"Saldo: {saldo}",                  "custom_id": "bn:saldo",    "disabled": True, "emoji": _em("cloud")},
                 ]})
+                comps.append(_bdiv(11))
 
-                # Progresso pro próximo bônus
-                comps.append({"id": 14, "type": 10, "content": (
-                    f"{GIFT} **Próximo Bônus**\n{barra}\n"
-                    f"-# Faltam **{falta} salas** para **+{_bpc3} sala(s) grátis**!"
+                # ── Bônus ganho por período ──
+                comps.append({"id": 12, "type": 10, "content": (
+                    f"### {e('clock')}  Bônus Ganho\n"
+                    f"-# Salas grátis recebidas automaticamente no período."
                 )})
+                comps.append({"id": 13, "type": 1, "components": [
+                    {"id": 14, "type": 2, "style": 3, "label": f"24h: +{ganho['dia']}",       "custom_id": "bn:dia",    "disabled": True, "emoji": _em("clock")},
+                    {"id": 15, "type": 2, "style": 1, "label": f"Semana: +{ganho['semana']}", "custom_id": "bn:semana", "disabled": True, "emoji": _em("calendario")},
+                    {"id": 16, "type": 2, "style": 2, "label": f"Total: +{ganho['total']}",   "custom_id": "bn:total2", "disabled": True, "emoji": _em("stats")},
+                ]})
+                comps.append(_bdiv(17))
 
-                # Botões interativos
+                # ── Próximo bônus ──
+                if tem:
+                    prox_txt = (
+                        f"### {e('presente')}  Próximo Bônus\n"
+                        f"{barra}\n"
+                        f"-# Faltam **{falta} salas** para **+{_bpc3} sala(s) grátis**!"
+                    )
+                else:
+                    prox_txt = (
+                        f"### {e('presente')}  Como Funciona\n"
+                        f"{barra}\n"
+                        f"-# A cada **{_br3} salas** compradas você ganha **+{_bpc3} grátis** — sem precisar resgatar!"
+                    )
+                comps.append({"id": 18, "type": 10, "content": prox_txt})
+                comps.append(_bdiv(19))
+
+                # ── Botões interativos ──
                 comps.append({"id": 20, "type": 1, "components": [
                     {"id": 21, "type": 2, "style": 3, "label": "Comprar Salas", "custom_id": "cw:comprar",    "emoji": _em("carteira")},
                     {"id": 22, "type": 2, "style": 2, "label": "Atualizar",     "custom_id": "cw:bonus",      "emoji": _em("refresh")},
