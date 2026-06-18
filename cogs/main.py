@@ -4848,8 +4848,6 @@ class SalaV2Cog(commands.Cog):
                 # ── Botões interativos ──
                 comps.append({"id": 20, "type": 1, "components": [
                     {"id": 21, "type": 2, "style": 3, "label": "Comprar Salas", "custom_id": "cw:comprar",    "emoji": _em("carteira")},
-                    {"id": 22, "type": 2, "style": 2, "label": "Atualizar",     "custom_id": "cw:bonus",      "emoji": _em("refresh")},
-                    {"id": 23, "type": 2, "style": 4, "label": "Resetar Faixa", "custom_id": "cw:bonus_reset", "emoji": _em("reloading")},
                 ]})
 
                 _bpayload = {"flags": 64|32768, "components": [{"id": 1, "type": 17, "accent_color": 0xFFD700, "components": comps}]}
