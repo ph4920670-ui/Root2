@@ -456,27 +456,9 @@ class ComprarCog(commands.Cog):
         code = await asyncio.to_thread(adicionar_saldo_usuario, uid, p["user_nome"], p["quantia"])
         await asyncio.to_thread(salvar_key_pedido, p["txid"], code)
 
-        # Registra a compra no sistema de bônus E resgata automaticamente o que estiver disponível.
-        # As salas bônus caem direto no saldo — sem precisar ir na carteira clicar em "Resgatar".
-        try:
-            _bres = await asyncio.to_thread(bonus_registrar_compra, uid, p["user_nome"], p["quantia"])
-            _bonus_auto = int((_bres or {}).get("bonus_concedido") or 0)
-            _log.info(f"[bonus auto] uid={uid} comprou={p['quantia']} bonus_creditado={_bonus_auto}")
-            if _bonus_auto > 0:
-                # Log interno
-                try:
-                    await _logs.log_bonus_automatico(uid, p["user_nome"], _bonus_auto)
-                except Exception as _ex:
-                    _log.warning(f"[bonus auto] log interno falhou: {_ex}")
-                # Log público (tenta com flag 'automatico', cai pra versão simples se a assinatura for antiga)
-                try:
-                    await _logs.log_pub_bonus(uid, p["user_nome"], _bonus_auto, automatico=True)
-                except TypeError:
-                    await _logs.log_pub_bonus(uid, p["user_nome"], _bonus_auto)
-                except Exception as _ex:
-                    _log.warning(f"[bonus auto] log público falhou: {_ex}")
-        except Exception as _ex:
-            _log.warning(f"[bonus auto] erro geral: {_ex}")
+        # OBS: o bônus NÃO é mais contado por compra — agora é contado por
+        # salas CRIADAS (ver _criar_sala_flow em cogs/main.py). A cada N salas
+        # criadas o usuário ganha +X grátis automaticamente.
 
         # Dá salas bônus automaticamente só se evento estiver ativo no /mod
         try:

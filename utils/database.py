@@ -1554,6 +1554,17 @@ def bonus_registrar_compra(user_id: str, user_nome: str, salas_compradas: int):
         return {"reg": {}, "bonus_concedido": 0, "code": None}
 
 
+def bonus_registrar_criacao(user_id: str, user_nome: str, qtd: int = 1):
+    """Conta salas CRIADAS para o bônus.
+
+    A cada N salas criadas (bonus_ratio, configurável no /mod) o usuário
+    ganha +X salas grátis (bonus_por_ciclo), creditadas automaticamente.
+    Reutiliza a mecânica de bonus_registrar_compra — o campo total_comprado
+    passa a representar 'salas criadas acumuladas'.
+    """
+    return bonus_registrar_compra(user_id, user_nome, qtd)
+
+
 def bonus_ganho_periodo(user_id: str) -> dict:
     """Quanto de bônus (salas grátis) o usuário ganhou nas últimas 24h e 7 dias.
 

@@ -674,6 +674,29 @@ async def _criar_sala_flow(ctx, modo, go, key_row=None, *, is_prefix=False, key_
         if key_row:
             r = key_row["quantia"] - key_row["salas_usadas"] - (0 if key_ja_consumida else 1)
             asyncio.create_task(_logs.log_key_consumida(author, key_row["code"], max(0,r)))
+
+        # ── Bônus por SALA CRIADA ────────────────────────────────────────
+        # A cada N salas criadas (bonus_ratio, /mod) o usuário ganha +X grátis,
+        # creditadas automaticamente no saldo.
+        try:
+            from utils.database import bonus_registrar_criacao as _breg
+            _bres = await asyncio.to_thread(_breg, str(author.id), author.display_name, 1)
+            _bonus_auto = int((_bres or {}).get("bonus_concedido") or 0)
+            _log.info(f"[bonus criacao] uid={author.id} +1 criada bonus_creditado={_bonus_auto}")
+            if _bonus_auto > 0:
+                try:
+                    await _logs.log_bonus_automatico(str(author.id), author.display_name, _bonus_auto)
+                except Exception as _ex:
+                    _log.warning(f"[bonus criacao] log interno falhou: {_ex}")
+                try:
+                    await _logs.log_pub_bonus(str(author.id), author.display_name, _bonus_auto, automatico=True)
+                except TypeError:
+                    await _logs.log_pub_bonus(str(author.id), author.display_name, _bonus_auto)
+                except Exception as _ex:
+                    _log.warning(f"[bonus criacao] log público falhou: {_ex}")
+        except Exception as _ex:
+            _log.warning(f"[bonus criacao] erro geral: {_ex}")
+
         from utils.api import api as _api
         api_nome = "API 1 — F" if _api._is_api1() else "API 2 — B"
         asyncio.create_task(_logs.log_sala_criada(author, m["nome"], pid, sala, go, guild, api_nome))
@@ -781,23 +804,8 @@ async def _reservar_sala(inter, modo, uid, display_nome):
     _log = logging.getLogger("salasff.reserva")
     gid = str(inter.guild.id) if inter.guild else None
     _log.info(f"[RESERVA] uid={uid} modo={modo} guild={gid}")
-    if gid:
-        cfg = await asyncio.to_thread(guild_config_get, gid)
-        cargo_id = cfg.get("cargo_sala_id")
-        saldo_guild = cfg.get("saldo", 0)
-        cargo_off = cfg.get("cargo_off", False)
-        _log.info(f"[RESERVA] guild cfg: saldo={saldo_guild} cargo_id={cargo_id} cargo_off={cargo_off}")
-        # Só usa saldo do servidor se: tem saldo, cargo não está OFF, e tem cargo configurado
-        if saldo_guild > 0 and not cargo_off and cargo_id:
-            tem_cargo = any(r.id == int(cargo_id) for r in getattr(inter.user, "roles", []))
-            _log.info(f"[RESERVA] tem_cargo={tem_cargo}")
-            if tem_cargo:
-                consumido = await asyncio.to_thread(guild_consumir_sala, gid)
-                _log.info(f"[RESERVA] guild_consumir={consumido} → saldo restante={cfg.get('saldo',0)-1 if consumido else cfg.get('saldo',0)}")
-                if consumido:
-                    return None, True, gid
-
-    # fallback: saldo pessoal
+    # Consumo SEMPRE do saldo pessoal das keys do usuário (saldo do servidor desativado).
+    # consumo pessoal
     k, restante = await asyncio.to_thread(reservar_sala_key, uid, modo, display_nome)
     _log.info(f"[RESERVA] pessoal: key={'SIM id='+k['id'] if k else 'NENHUMA'} restante={restante}")
     # Se saldo zerou (restante==0 nessa key e sem outras), remove cargo saldo em background
@@ -951,13 +959,13 @@ class SaldoPainelView(discord.ui.View):
         total = b["total_comprado"]; bonus_disp = b["bonus_disponivel"]; bonus_total = b["bonus_total"]; resgatado = b["bonus_resgatado"]
         if total == 0:
             em.description = (
-                f"{OFF} Você ainda não comprou salas.\n\n"
-                f"{DOT} A cada **{_br} salas** compradas você ganha **+{_bpc} sala(s) grátis** automáticas!\n\n"
+                f"{OFF} Você ainda não criou salas.\n\n"
+                f"{DOT} A cada **{_br} salas** criadas você ganha **+{_bpc} sala(s) grátis** automáticas!\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
         else:
-            em.add_field(name=f"{STATS}  Suas Compras", value=(
-                f"> {CART} Total comprado: **{total} salas**\n"
+            em.add_field(name=f"{STATS}  Suas Salas", value=(
+                f"> {CART} Total criadas: **{total} salas**\n"
                 f"> {PRESENTE} Bônus recebido (automático): **{resgatado} salas**\n"
                 f"> {ON} Bônus gerado: **{bonus_total} salas** (+{_bpc} a cada {_br})"
             ), inline=False)
@@ -970,7 +978,7 @@ class SaldoPainelView(discord.ui.View):
         falta = b["falta_proximo"]; compradas_ciclo = _br - falta
         progresso = int((compradas_ciclo / _br) * 10)
         barra_str = f"`{'█' * progresso}{'░' * (10 - progresso)}` {compradas_ciclo}/{_br}"
-        em.add_field(name=f"{GIFT}  Próximo Bônus", value=f"> {barra_str}\n> Compre mais **{falta} salas** para ganhar **+{_bpc} sala(s) grátis**!", inline=False)
+        em.add_field(name=f"{GIFT}  Próximo Bônus", value=f"> {barra_str}\n> Crie mais **{falta} salas** para ganhar **+{_bpc} sala(s) grátis**!", inline=False)
         await inter.followup.send(embed=em, view=BonusPainelView(bonus_disp, saldo, total), ephemeral=True)
 
 
@@ -1393,7 +1401,7 @@ def _tutorial_bonus_v2_payload() -> dict:
             {"id": 5, "type": 10, "content": texto},
             {"id": 6, "type": 14, "divider": True, "spacing": 1},
             {"id": 7, "type": 10, "content": (
-                f"{e('click')}  **Dica:** a cada **10 salas compradas** você ganha **+2 salas grátis** automaticamente."
+                f"{e('click')}  **Dica:** a cada **10 salas criadas** você ganha **+2 salas grátis** automaticamente."
             )},
             {"id": 8, "type": 10, "content": "-# F Applications • Tutorial de bônus"},
         ]}],
@@ -1420,7 +1428,7 @@ def _tutorial_bonus_embed() -> discord.Embed:
         f"{DOLLAR}  **5. Resgate suas salas grátis**\n"
         f"-# Clique em **Resgatar** e suas salas bônus vão direto pro seu saldo. Prontas pra usar em `/c1` `/c2` `/c3`.\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"{CLICK}  **Dica:** a cada **10 salas compradas** você ganha **+2 salas grátis** automaticamente."
+        f"{CLICK}  **Dica:** a cada **10 salas criadas** você ganha **+2 salas grátis** automaticamente."
     )
     em.set_footer(text="F Applications • Tutorial de bônus")
     return em
@@ -1534,15 +1542,15 @@ class CarteiraView(discord.ui.View):
 
         if total == 0:
             em.description = (
-                f"{OFF} Você ainda não comprou salas.\n\n"
-                f"{DOT} A cada **{_br} salas** compradas você ganha **+{_bpc} sala(s) grátis** automáticas!\n\n"
+                f"{OFF} Você ainda não criou salas.\n\n"
+                f"{DOT} A cada **{_br} salas** criadas você ganha **+{_bpc} sala(s) grátis** automáticas!\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
         else:
             em.add_field(
-                name=f"{STATS}  Suas Compras",
+                name=f"{STATS}  Suas Salas",
                 value=(
-                    f"> {CART} Total comprado: **{total} salas**\n"
+                    f"> {CART} Total criadas: **{total} salas**\n"
                     f"> {PRESENTE} Bônus recebido (automático): **{resgatado} salas**\n"
                     f"> {ON} Bônus gerado: **{bonus_total} salas** (+{_bpc} a cada {_br})"
                 ),
@@ -1572,7 +1580,7 @@ class CarteiraView(discord.ui.View):
         barra = f"`{'█' * progresso}{'░' * (10 - progresso)}` {compradas_ciclo}/{_br}"
         em.add_field(
             name=f"{GIFT}  Próximo Bônus",
-            value=f"> {barra}\n> Compre mais **{falta} salas** para ganhar **+{_bpc} sala(s) grátis**!",
+            value=f"> {barra}\n> Crie mais **{falta} salas** para ganhar **+{_bpc} sala(s) grátis**!",
             inline=False,
         )
 
@@ -1622,7 +1630,7 @@ class BonusPainelView(discord.ui.View):
                 em.description = (
                     f"{DOT} Você não tem bônus para resgatar no momento.\n\n"
                     f"{PRESENTE} Continue comprando salas para acumular bônus!\n"
-                    f"{CART} Total comprado: **{b['total_comprado']} salas**\n"
+                    f"{CART} Total criadas: **{b['total_comprado']} salas**\n"
                     f"{GIFT} Faltam **{b['falta_proximo']} salas** para o próximo bônus!"
                 )
                 return await inter.followup.send(embed=em, ephemeral=True)
@@ -1667,7 +1675,7 @@ class BonusPainelView(discord.ui.View):
             em.add_field(
                 name=f"{PRESENTE}  Bônus",
                 value=(
-                    f"> Total comprado: **{b['total_comprado']} salas**\n"
+                    f"> Total criadas: **{b['total_comprado']} salas**\n"
                     f"> Bônus disponível: **{b['bonus_disponivel']} sala(s)**\n"
                     f"> Próximo bônus em: **{b['falta_proximo']} salas**"
                 ),
@@ -1695,7 +1703,7 @@ class BonusPainelView(discord.ui.View):
             f"**⚠️ ATENÇÃO — Esta ação é irreversível!**\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"{STATS} Seus dados atuais:\n"
-            f"> {CART} Total comprado: **{b['total_comprado']} salas**\n"
+            f"> {CART} Total criadas: **{b['total_comprado']} salas**\n"
             f"> {PRESENTE} Bônus resgatado: **{b['bonus_resgatado']} salas**\n"
             f"> {ON} Bônus gerado: **{b['bonus_total']} salas**\n\n"
             f"{RAGE} Ao confirmar:\n"
@@ -4811,7 +4819,7 @@ class SalaV2Cog(commands.Cog):
                 # ── Sua Faixa (status em botões) ──
                 comps.append({"id": 6, "type": 10, "content": f"### {e('stats')}  Sua Faixa"})
                 comps.append({"id": 7, "type": 1, "components": [
-                    {"id": 8,  "type": 2, "style": 2, "label": f"Comprado: {b['total_comprado']}", "custom_id": "bn:total",    "disabled": True, "emoji": _em("carteira")},
+                    {"id": 8,  "type": 2, "style": 2, "label": f"Criadas: {b['total_comprado']}", "custom_id": "bn:total",    "disabled": True, "emoji": _em("carteira")},
                     {"id": 9,  "type": 2, "style": 3, "label": f"Bônus: {b['bonus_resgatado']}",   "custom_id": "bn:recebido", "disabled": True, "emoji": _em("presente")},
                     {"id": 10, "type": 2, "style": 1, "label": f"Saldo: {saldo}",                  "custom_id": "bn:saldo",    "disabled": True, "emoji": _em("cloud")},
                 ]})
@@ -4840,7 +4848,7 @@ class SalaV2Cog(commands.Cog):
                     prox_txt = (
                         f"### {e('presente')}  Como Funciona\n"
                         f"{barra}\n"
-                        f"-# A cada **{_br3} salas** compradas você ganha **+{_bpc3} grátis** — sem precisar resgatar!"
+                        f"-# A cada **{_br3} salas** criadas você ganha **+{_bpc3} grátis** — direto no saldo!"
                     )
                 comps.append({"id": 18, "type": 10, "content": prox_txt})
                 comps.append(_bdiv(19))
@@ -4864,8 +4872,8 @@ class SalaV2Cog(commands.Cog):
                 if not _bok:
                     em = discord.Embed(title=f"{PRESENTE}  Painel de Bônus", color=0xFFD700)
                     em.set_thumbnail(url=inter.user.display_avatar.url)
-                    em.add_field(name=f"{STATS} Suas Compras", value=(
-                        f"> Total: **{b['total_comprado']}** salas\n"
+                    em.add_field(name=f"{STATS} Suas Salas", value=(
+                        f"> Total criadas: **{b['total_comprado']}** salas\n"
                         f"> Bônus recebido: **{b['bonus_resgatado']}** salas\n"
                         f"> Ganhou 24h: **+{ganho['dia']}** • Semana: **+{ganho['semana']}**"
                     ), inline=False)
@@ -4883,7 +4891,7 @@ class SalaV2Cog(commands.Cog):
                 em.description = (
                     f"**⚠️ ATENÇÃO — Esta ação é irreversível!**\n\n"
                     f"{STATS} Seus dados atuais:\n"
-                    f"> {CART} Total comprado: **{b['total_comprado']} salas**\n"
+                    f"> {CART} Total criadas: **{b['total_comprado']} salas**\n"
                     f"> {PRESENTE} Bônus recebido: **{b['bonus_resgatado']} salas**\n\n"
                     f"{RAGE} Ao confirmar, seu contador volta a **0**.\n"
                     f"{DOT} Tem certeza que deseja **resetar**?"
