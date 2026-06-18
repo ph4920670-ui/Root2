@@ -1,6 +1,6 @@
 # cogs/comprar.py — Sistema de compra PIX (v3 + org integration)
 
-import asyncio, io, base64
+import asyncio, io, base64, logging
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 import config
 _ADMIN_GUILDS = [discord.Object(id=gid) for gid in config.OWNER_GUILD_IDS]
 from utils import logs as _logs
+
+_log = logging.getLogger("salasff.comprar")
 from utils.emojis import PE, BOT, STATS, SETTINGS, INFO, DOT, ON, OFF, GIFT, CART, TOP, MOBILE, PLAY, MONEY
 from utils.pix import criar_cobranca_pix, consultar_cobranca, get_preco_por_sala, get_preco_por_sala_guild, get_banco_ativo
 from utils.database import (
@@ -459,14 +461,22 @@ class ComprarCog(commands.Cog):
         try:
             _bres = await asyncio.to_thread(bonus_registrar_compra, uid, p["user_nome"], p["quantia"])
             _bonus_auto = int((_bres or {}).get("bonus_concedido") or 0)
+            _log.info(f"[bonus auto] uid={uid} comprou={p['quantia']} bonus_creditado={_bonus_auto}")
             if _bonus_auto > 0:
-                # Log interno + log público do bônus automático
-                asyncio.create_task(_logs.log_bonus_automatico(uid, p["user_nome"], _bonus_auto))
-                asyncio.create_task(_logs.log_pub_bonus(
-                    uid, p["user_nome"], _bonus_auto, automatico=True,
-                ))
-        except Exception:
-            pass
+                # Log interno
+                try:
+                    await _logs.log_bonus_automatico(uid, p["user_nome"], _bonus_auto)
+                except Exception as _ex:
+                    _log.warning(f"[bonus auto] log interno falhou: {_ex}")
+                # Log público (tenta com flag 'automatico', cai pra versão simples se a assinatura for antiga)
+                try:
+                    await _logs.log_pub_bonus(uid, p["user_nome"], _bonus_auto, automatico=True)
+                except TypeError:
+                    await _logs.log_pub_bonus(uid, p["user_nome"], _bonus_auto)
+                except Exception as _ex:
+                    _log.warning(f"[bonus auto] log público falhou: {_ex}")
+        except Exception as _ex:
+            _log.warning(f"[bonus auto] erro geral: {_ex}")
 
         # Dá salas bônus automaticamente só se evento estiver ativo no /mod
         try:
