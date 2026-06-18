@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Org — SalasFF{% endblock %}
+
+{% block sidebar %}
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <span class="sidebar-label">Org: {{ org.nome or org._id }}</span>
+    <a href="/org/" class="sidebar-link active">Dashboard</a>
+    <a href="/org/saques" class="sidebar-link">Meus Saques</a>
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ org.nome or 'Minha Org' }}</h1>
+  <p class="page-subtitle">Painel de controle da sua organização de revenda.</p>
+</div>
+
+<div class="stats-grid stats-grid-4">
+  <div class="stat-card stat-accent">
+    <div class="stat-value">{{ salas_semana }}</div>
+    <div class="stat-label">Salas esta semana</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ salas_mes }}</div>
+    <div class="stat-label">Salas este mês</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">R$ {{ "%.2f" | format(faturamento_mes) }}</div>
+    <div class="stat-label">Faturamento do mês</div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-value">R$ {{ "%.2f" | format(saldo) }}</div>
+    <div class="stat-label">Saldo disponível ({{ porcentagem | int }}%)</div>
+  </div>
+</div>
+
+<div class="grid-2col">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Faturamento</h2>
+    </div>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">Faturamento esta semana</span>
+        <span class="info-value">R$ {{ "%.2f" | format(faturamento_semana) }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Faturamento este mês</span>
+        <span class="info-value">R$ {{ "%.2f" | format(faturamento_mes) }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Faturamento total</span>
+        <span class="info-value">R$ {{ "%.2f" | format(org.faturamento_total or 0) }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Total de salas criadas</span>
+        <span class="info-value">{{ org.salas_total or 0 }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Preço por sala</span>
+        <span class="info-value">R$ {{ "%.2f" | format(preco_sala) }}</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Sua porcentagem</span>
+        <span class="info-value">{{ porcentagem | int }}%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Saldo e Saques</h2>
+    </div>
+    <div class="saldo-display">
+      <div class="saldo-value">R$ {{ "%.2f" | format(saldo) }}</div>
+      <div class="saldo-label">disponível para saque</div>
+    </div>
+    {% if saques_pendentes %}
+    <div class="alert alert-warning mt-1">
+      ⏳ {{ saques_pendentes | length }} saque(s) pendente(s) em análise.
+    </div>
+    {% endif %}
+    {% if saldo >= 10 %}
+    <a href="/org/saques" class="btn btn-primary btn-block mt-2">Solicitar Saque</a>
+    {% else %}
+    <button class="btn btn-primary btn-block mt-2" disabled title="Saldo mínimo R$ 10,00">
+      Saldo insuficiente (mín. R$ 10,00)
+    </button>
+    {% endif %}
+    <a href="/org/saques" class="btn btn-ghost btn-block mt-1">Ver histórico de saques</a>
+  </div>
+</div>
+{% endblock %}

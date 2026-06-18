@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Meus Saques — SalasFF{% endblock %}
+
+{% block sidebar %}
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <span class="sidebar-label">Org: {{ org.nome or org._id }}</span>
+    <a href="/org/" class="sidebar-link">Dashboard</a>
+    <a href="/org/saques" class="sidebar-link active">Meus Saques</a>
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Saques</h1>
+  <p class="page-subtitle">Solicite e acompanhe seus saques.</p>
+</div>
+
+{% if request.query_params.get('msg') == 'solicitado' %}
+<div class="alert alert-success">✓ Saque solicitado! Aguarde a aprovação do administrador.</div>
+{% elif request.query_params.get('erro') == 'saldo_insuficiente' %}
+<div class="alert alert-error">Saldo insuficiente para o saque solicitado.</div>
+{% endif %}
+
+<div class="grid-2col">
+  <!-- Solicitar saque -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Solicitar Saque</h2>
+    </div>
+    <div class="saldo-mini">
+      Saldo disponível: <strong>R$ {{ "%.2f" | format(saldo) }}</strong>
+    </div>
+    {% if saldo >= 10 %}
+    <form method="POST" action="/org/saques/solicitar" class="form">
+      <div class="form-group">
+        <label class="form-label">Valor (R$)</label>
+        <input type="number" name="valor" class="form-input" step="0.01"
+               min="10" max="{{ saldo }}" placeholder="Ex: 50.00" required/>
+        <span class="form-hint">Mínimo R$ 10,00 · Máximo R$ {{ "%.2f" | format(saldo) }}</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Chave PIX</label>
+        <input type="text" name="pix_key" class="form-input"
+               placeholder="CPF, e-mail, telefone ou chave aleatória" required/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block"
+              onclick="return confirm('Confirmar saque de R$ ' + this.form.valor.value + '?')">
+        Solicitar Saque
+      </button>
+    </form>
+    {% else %}
+    <div class="empty-state-mini">
+      <p class="text-muted">Saldo mínimo para saque é R$ 10,00.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Histórico -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Histórico</h2>
+    </div>
+    {% if saques %}
+    <div class="saques-list">
+      {% for s in saques %}
+      <div class="saque-item saque-{{ s.status }}">
+        <div class="saque-header">
+          <span class="saque-valor">R$ {{ "%.2f" | format(s.valor) }}</span>
+          <span class="badge badge-{{ 'success' if s.status == 'aprovado' else ('warning' if s.status == 'pendente' else 'error') }}">
+            {{ s.status | capitalize }}
+          </span>
+        </div>
+        <div class="saque-pix text-muted text-sm">PIX: {{ s.pix_key }}</div>
+        <div class="saque-data text-muted text-sm">{{ s.criado_em[:19].replace('T',' ') }}</div>
+        {% if s.motivo_rejeicao %}
+        <div class="saque-motivo text-sm text-error">Motivo: {{ s.motivo_rejeicao }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state-mini">
+      <p class="text-muted">Nenhum saque realizado ainda.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

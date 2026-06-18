@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Saques Pendentes — SalasFF Admin{% endblock %}
+
+{% block sidebar %}
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <span class="sidebar-label">Admin</span>
+    <a href="/admin/" class="sidebar-link">← Voltar</a>
+    <a href="/admin/saques" class="sidebar-link active">Saques Pendentes</a>
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Saques Pendentes</h1>
+</div>
+
+{% if request.query_params.get('msg') == 'aprovado' %}
+<div class="alert alert-success">✓ Saque aprovado com sucesso!</div>
+{% elif request.query_params.get('msg') == 'rejeitado' %}
+<div class="alert alert-error">Saque rejeitado.</div>
+{% endif %}
+
+{% if saques %}
+<div class="card">
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Guild ID</th>
+          <th>Dono (Discord ID)</th>
+          <th>Valor</th>
+          <th>Chave PIX</th>
+          <th>Solicitado em</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in saques %}
+        <tr>
+          <td><code>{{ s._id[:8] }}…</code></td>
+          <td><code>{{ s.guild_id }}</code></td>
+          <td><code>{{ s.owner_discord_id }}</code></td>
+          <td class="text-success"><strong>R$ {{ "%.2f" | format(s.valor) }}</strong></td>
+          <td><code>{{ s.pix_key }}</code></td>
+          <td class="text-muted text-sm">{{ s.criado_em[:19].replace('T',' ') }}</td>
+          <td class="actions-cell">
+            <form method="POST" action="/admin/saques/{{ s._id }}/aprovar" style="display:inline">
+              <button type="submit" class="btn btn-sm btn-success"
+                      onclick="return confirm('Confirmar aprovação de R$ {{ '%.2f' | format(s.valor) }}?')">
+                ✓ Aprovar
+              </button>
+            </form>
+            <button class="btn btn-sm btn-danger" onclick="openRejectModal('{{ s._id }}')">
+              ✗ Rejeitar
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">✓</div>
+  <h2>Nenhum saque pendente</h2>
+  <p class="text-muted">Todos os saques foram processados.</p>
+</div>
+{% endif %}
+
+<!-- Reject Modal -->
+<div id="rejectModal" class="modal" style="display:none">
+  <div class="modal-backdrop" onclick="closeRejectModal()"></div>
+  <div class="modal-box">
+    <h3 class="modal-title">Rejeitar Saque</h3>
+    <form id="rejectForm" method="POST" class="form">
+      <div class="form-group">
+        <label class="form-label">Motivo da rejeição</label>
+        <textarea name="motivo" class="form-input" rows="3"
+                  placeholder="Ex: Chave PIX inválida, saldo insuficiente..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeRejectModal()">Cancelar</button>
+        <button type="submit" class="btn btn-danger">Confirmar Rejeição</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openRejectModal(saqueId) {
+  document.getElementById('rejectForm').action = '/admin/saques/' + saqueId + '/rejeitar';
+  document.getElementById('rejectModal').style.display = 'flex';
+}
+function closeRejectModal() {
+  document.getElementById('rejectModal').style.display = 'none';
+}
+</script>
+{% endblock %}

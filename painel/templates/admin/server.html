@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Configurar Servidor — SalasFF Admin{% endblock %}
+
+{% block sidebar %}
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <span class="sidebar-label">Admin</span>
+    <a href="/admin/" class="sidebar-link">← Voltar</a>
+    <a href="/admin/saques" class="sidebar-link">Saques Pendentes</a>
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Configurar Servidor</h1>
+  <p class="page-subtitle"><code>{{ guild_id }}</code></p>
+</div>
+
+{% if request.query_params.get('saved') %}
+<div class="alert alert-success">✓ Configurações salvas com sucesso!</div>
+{% endif %}
+
+<div class="grid-2col">
+
+  <!-- Org Config -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Configuração de Org</h2>
+    </div>
+    <form method="POST" action="/admin/server/{{ guild_id }}/org" class="form">
+      <div class="form-group">
+        <label class="form-label">Nome da Org</label>
+        <input type="text" name="nome" class="form-input"
+               value="{{ org.nome or '' }}" placeholder="Nome do servidor"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Discord ID do Dono da Org</label>
+        <input type="text" name="owner_discord_id" class="form-input"
+               value="{{ org.owner_discord_id or '' }}" placeholder="Ex: 123456789012345678"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Porcentagem do Dono da Org (%)</label>
+        <input type="number" name="porcentagem" class="form-input"
+               value="{{ org.porcentagem or 70 }}" min="1" max="99"/>
+        <span class="form-hint">O admin recebe o restante ({{ 100 - (org.porcentagem or 70) }}%).</span>
+      </div>
+      <div class="form-group">
+        <label class="toggle-label">
+          <input type="checkbox" name="ativo" class="toggle-input"
+                 {% if org.ativo %}checked{% endif %} value="on"/>
+          <span class="toggle-switch"></span>
+          <span>Org Revenda Ativa</span>
+        </label>
+      </div>
+
+      {% if org %}
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Faturamento Total</span>
+          <span class="info-value">R$ {{ "%.2f" | format(org.faturamento_total or 0) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Saldo Acumulado</span>
+          <span class="info-value">R$ {{ "%.2f" | format(org.saldo_acumulado or 0) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Total de Salas</span>
+          <span class="info-value">{{ org.salas_total or 0 }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary btn-block">Salvar Org</button>
+    </form>
+  </div>
+
+  <!-- Commands Config -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Comandos</h2>
+      <span class="text-muted">Ativar/desativar por servidor</span>
+    </div>
+    <form method="POST" action="/admin/server/{{ guild_id }}/commands" class="form">
+      {% for cmd in all_cmds %}
+      <div class="form-group toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" name="cmd_{{ cmd }}" class="toggle-input"
+                 {% if commands.get(cmd, True) %}checked{% endif %} value="on"/>
+          <span class="toggle-switch"></span>
+          <span class="cmd-name"><code>+{{ cmd }}</code> / <code>/{{ cmd }}</code></span>
+        </label>
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary btn-block mt-2">Salvar Comandos</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

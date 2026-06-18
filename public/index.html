@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F Applications — Sala Bot Free Fire</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --green:#00FF7F;--green2:#00e670;--blue:#5865F2;
+  --bg:#06090f;--card:#0b1120;--border:#ffffff0a;
+  --text:#e2e8f0;--muted:#64748b;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);font-family:'Inter',sans-serif;color:var(--text);overflow-x:hidden}
+
+/* Background */
+.glow{position:fixed;pointer-events:none;z-index:0;border-radius:50%}
+.glow-1{top:-300px;left:20%;width:800px;height:800px;background:radial-gradient(ellipse,#00FF7F07,transparent 70%)}
+.glow-2{bottom:-200px;right:5%;width:600px;height:600px;background:radial-gradient(ellipse,#5865F206,transparent 70%)}
+
+/* Nav */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:66px;padding:0 40px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:#06090fd9;backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.05rem;color:#fff;text-decoration:none}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:var(--green);animation:blink 2.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 0 0 #00FF7F44}50%{opacity:.5;box-shadow:0 0 0 8px transparent}}
+.nav-right{display:flex;align-items:center;gap:10px}
+.online-badge{
+  display:flex;align-items:center;gap:6px;
+  background:#00FF7F10;border:1px solid #00FF7F28;
+  border-radius:999px;padding:5px 14px;
+  font-size:.73rem;font-weight:600;color:var(--green);
+}
+.online-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.btn-add{
+  background:var(--green);color:#000;font-weight:700;
+  padding:9px 20px;border-radius:10px;text-decoration:none;font-size:.82rem;
+  transition:opacity .2s,transform .2s;
+}
+.btn-add:hover{opacity:.85;transform:translateY(-1px)}
+
+/* Hero */
+.hero{
+  position:relative;z-index:1;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:100px 24px 80px;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:#ffffff08;border:1px solid #ffffff10;
+  border-radius:999px;padding:6px 18px;
+  font-size:.73rem;font-weight:600;color:#94a3b8;
+  letter-spacing:.05em;margin-bottom:30px;
+}
+.eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+h1{
+  font-size:clamp(3rem,7vw,5.8rem);font-weight:900;
+  line-height:1.07;letter-spacing:-.025em;margin-bottom:20px;
+}
+.t-white{color:#fff}
+.t-green{
+  background:linear-gradient(135deg,var(--green),var(--green2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-sub{
+  color:var(--muted);font-size:1.05rem;line-height:1.75;
+  max-width:500px;margin-bottom:44px;
+}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.btn-primary{
+  background:linear-gradient(135deg,var(--green),var(--green2));
+  color:#000;font-weight:700;padding:15px 30px;border-radius:13px;
+  text-decoration:none;font-size:.95rem;
+  transition:transform .2s,box-shadow .2s;
+}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 16px 40px #00FF7F25}
+.btn-outline{
+  background:transparent;color:#94a3b8;
+  border:1px solid #ffffff14;font-weight:600;
+  padding:15px 30px;border-radius:13px;
+  text-decoration:none;font-size:.95rem;transition:all .2s;
+}
+.btn-outline:hover{border-color:#ffffff28;color:#fff}
+
+/* Stats */
+.stats{
+  display:flex;flex-wrap:wrap;justify-content:center;
+  gap:0;margin-top:64px;max-width:640px;width:100%;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:20px;overflow:hidden;
+}
+.stat{
+  flex:1;min-width:120px;padding:28px 16px;text-align:center;
+  border-right:1px solid var(--border);
+  transition:background .2s;
+}
+.stat:last-child{border-right:none}
+.stat:hover{background:#ffffff04}
+.stat-n{font-size:2rem;font-weight:900;color:var(--green);line-height:1;margin-bottom:6px}
+.stat-l{color:var(--muted);font-size:.73rem;font-weight:500}
+
+/* Section */
+.sec{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:100px 24px}
+.sec-label{
+  display:inline-block;background:#00FF7F15;color:var(--green);
+  border:1px solid #00FF7F2a;border-radius:999px;
+  padding:4px 14px;font-size:.7rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;
+}
+.sec-title{font-size:2.2rem;font-weight:800;color:#fff;margin-bottom:14px;letter-spacing:-.01em}
+.sec-sub{color:var(--muted);font-size:.92rem;line-height:1.75;margin-bottom:52px;max-width:460px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+
+/* Cards */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:18px;padding:28px;
+  transition:border-color .25s,transform .25s;
+}
+.card:hover{border-color:#00FF7F20;transform:translateY(-4px)}
+.card-icon{
+  width:52px;height:52px;border-radius:13px;
+  background:#00FF7F15;display:flex;align-items:center;
+  justify-content:center;font-size:1.6rem;margin-bottom:18px;
+}
+.card h3{color:#fff;font-size:.93rem;font-weight:700;margin-bottom:10px}
+.card p{color:var(--muted);font-size:.82rem;line-height:1.65}
+
+/* CTA */
+.cta-wrap{position:relative;z-index:1;padding:60px 24px 110px;text-align:center}
+.cta-box{
+  max-width:580px;margin:0 auto;
+  background:linear-gradient(145deg,#0c1f15,#0a182a);
+  border:1px solid #00FF7F20;border-radius:24px;padding:56px 40px;
+  box-shadow:0 0 100px #00FF7F08;
+}
+.cta-box h2{font-size:2rem;font-weight:800;color:#fff;margin-bottom:14px}
+.cta-box p{color:var(--muted);line-height:1.75;margin-bottom:32px}
+
+/* Footer */
+footer{
+  position:relative;z-index:1;
+  border-top:1px solid var(--border);
+  padding:28px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;
+  color:#374151;font-size:.76rem;
+}
+footer a{color:var(--green);text-decoration:none}
+
+@media(max-width:640px){
+  nav{padding:0 20px}
+  .btn-add{display:none}
+  h1{font-size:2.6rem}
+  .stats{border-radius:16px}
+  .stat{min-width:90px;padding:20px 10px}
+  .cta-box{padding:36px 24px}
+  footer{flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div class="glow glow-1"></div>
+<div class="glow glow-2"></div>
+
+<!-- Nav -->
+<nav>
+  <a href="/" class="logo">
+    <div class="logo-dot"></div>
+    F Applications
+  </a>
+  <div class="nav-right">
+    <div class="online-badge"><div class="online-dot"></div> Online 24/7</div>
+    <a href="https://discord.com/oauth2/authorize?client_id=1481499372750635038&integration_type=1&scope=applications.commands" class="btn-add">➕ Adicionar</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="eyebrow"><div class="eyebrow-dot"></div> Free Fire · Sala Bot · v10</div>
+  <h1>
+    <span class="t-white">Crie salas</span><br>
+    <span class="t-green">Free Fire</span><br>
+    <span class="t-white">em segundos</span>
+  </h1>
+  <p class="hero-sub">O bot mais completo para criação de salas no Free Fire. Rápido, confiável e com pagamento automático via PIX.</p>
+  <div class="hero-btns">
+    <a href="https://discord.com/oauth2/authorize?client_id=1481499372750635038&integration_type=1&scope=applications.commands" class="btn-primary">➕ Adicionar ao Discord</a>
+    <a href="https://discord.gg/" class="btn-outline">💬 Suporte</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n">100+</div><div class="stat-l">Servidores</div></div>
+    <div class="stat"><div class="stat-n">3</div><div class="stat-l">Modos de Sala</div></div>
+    <div class="stat"><div class="stat-n">24/7</div><div class="stat-l">Disponível</div></div>
+    <div class="stat"><div class="stat-n">PIX</div><div class="stat-l">Pagamento</div></div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="sec">
+  <div class="sec-label">⚡ Recursos</div>
+  <div class="sec-title">Tudo que você precisa</div>
+  <p class="sec-sub">Funcionalidades completas para gerenciar salas, vendas e clientes no seu servidor Discord.</p>
+  <div class="grid">
+    <div class="card"><div class="card-icon">⚔️</div><h3>3 Modos de Sala</h3><p>Normal, Infinito e Full Capa. Crie com um clique e defina o tempo de início automaticamente.</p></div>
+    <div class="card"><div class="card-icon">💳</div><h3>Pagamento via PIX</h3><p>QR Code gerado na hora. Salas creditadas automaticamente após confirmação do pagamento.</p></div>
+    <div class="card"><div class="card-icon">🛡️</div><h3>Anti-Caí Automático</h3><p>Se uma API falhar, o bot troca instantaneamente para garantir que sua sala seja criada.</p></div>
+    <div class="card"><div class="card-icon">🎁</div><h3>Salas Teste Grátis</h3><p>5 salas gratuitas para novos usuários. Teste o serviço antes de comprar qualquer coisa.</p></div>
+    <div class="card"><div class="card-icon">📊</div><h3>Painel Admin Completo</h3><p>Controle vendas, saldos, logs, keys e configurações direto pelo Discord.</p></div>
+    <div class="card"><div class="card-icon">🔑</div><h3>Sistema de Keys</h3><p>Distribua keys de salas facilmente com controle de quantidade e uso por cliente.</p></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-wrap">
+  <div class="cta-box">
+    <h2>Pronto para começar? 🚀</h2>
+    <p>Adicione o bot ao seu servidor em segundos e comece a criar salas Free Fire agora mesmo.</p>
+    <a href="https://discord.com/oauth2/authorize?client_id=1481499372750635038&integration_type=1&scope=applications.commands" class="btn-primary">➕ Adicionar ao Discord — Grátis</a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <span>© 2026 <a href="/">F Applications</a> · Todos os direitos reservados</span>
+  <span>Feito com ❤️ para a comunidade Free Fire</span>
+</footer>
+
+</body>
+</html>

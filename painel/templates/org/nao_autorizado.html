@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Sem Acesso — SalasFF Org{% endblock %}
+{% block content %}
+<div class="empty-state">
+  <div class="empty-icon">🔒</div>
+  <h2>Acesso Negado</h2>
+  <p>Sua conta Discord (<strong>{{ user.global_name or user.username }}</strong>) não está vinculada a nenhuma organização ativa.</p>
+  <p class="text-muted">Entre em contato com o administrador para ser cadastrado como dono de uma org.</p>
+  <a href="/logout" class="btn btn-primary">Sair</a>
+</div>
+{% endblock %}

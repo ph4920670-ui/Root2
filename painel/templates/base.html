@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}SalasFF Panel{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <span class="brand-icon">🎮</span>
+      <span class="brand-name">SalasFF</span>
+      <span class="brand-panel">Panel</span>
+    </div>
+    <div class="navbar-links">
+      {% if user %}
+        <div class="nav-user">
+          {% if user.avatar %}
+            <img class="nav-avatar" src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=32" alt="avatar"/>
+          {% else %}
+            <div class="nav-avatar-placeholder">{{ user.global_name[0] | upper }}</div>
+          {% endif %}
+          <span class="nav-username">{{ user.global_name or user.username }}</span>
+        </div>
+        <a href="/logout" class="btn btn-ghost btn-sm">Sair</a>
+      {% else %}
+        <a href="/login" class="btn btn-primary btn-sm">Login</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <div class="layout">
+    {% block sidebar %}{% endblock %}
+    <main class="main-content">
+      {% block flash %}{% endblock %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
