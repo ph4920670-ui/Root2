@@ -508,7 +508,7 @@ class _EditDescModal(discord.ui.Modal, title="Editar Descrição"):
 PLANOS_INF = {
     "4d": {
         "nome":      "4 Dias",
-        "preco":     35.99,
+        "preco":     30.00,
         "emoji_key": "swordbattle",
         "desc":      "4 dias com salas sem limite.",
     },
@@ -664,7 +664,7 @@ class PlanoCog(commands.Cog):
     @commands.command(name="planosinf")
     async def prefix_planosinf(self, ctx, membro: discord.Member = None, plano: str = None):
         """Concede plano de Salas Infinitas a um membro.
-        +planosinf @user 4d   → 4 dias  (R$ 35,99)
+        +planosinf @user 4d   → 4 dias  (R$ 30,00)
         +planosinf @user 7d   → semanal (R$ 45)
         +planosinf @user off  → remove
         """
@@ -679,7 +679,7 @@ class PlanoCog(commands.Cog):
             em = discord.Embed(
                 title="📋  +planosinf — uso",
                 description=(
-                    "`+planosinf @user 4d`  → 4 dias (R$ 35,99)\n"
+                    "`+planosinf @user 4d`  → 4 dias (R$ 30,00)\n"
                     "`+planosinf @user 7d`  → semanal (R$ 45,00)\n"
                     "`+planosinf @user off` → remove o plano"
                 ),
