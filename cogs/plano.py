@@ -506,12 +506,6 @@ class _EditDescModal(discord.ui.Modal, title="Editar Descrição"):
 # ══════════════════════════════════════════════════════════════
 
 PLANOS_INF = {
-    "1d": {
-        "nome":      "1 Dia",
-        "preco":     10.00,
-        "emoji_key": "clockcheck",
-        "desc":      "Salas infinitas por 1 dia inteiro.",
-    },
     "4d": {
         "nome":      "4 Dias",
         "preco":     35.99,
@@ -520,7 +514,7 @@ PLANOS_INF = {
     },
     "7d": {
         "nome":      "Semanal",
-        "preco":     70.00,
+        "preco":     45.00,
         "emoji_key": "presente",
         "desc":      "1 semana completa de salas infinitas.",
     },
@@ -589,7 +583,6 @@ def _build_inf_selecionado_payload(plano_id: str) -> dict:
 
 
 _DURACAO_PLANO_INF = {
-    "1d": 1 * 24 * 3600,
     "4d": 4 * 24 * 3600,
     "7d": 7 * 24 * 3600,
 }
@@ -671,9 +664,8 @@ class PlanoCog(commands.Cog):
     @commands.command(name="planosinf")
     async def prefix_planosinf(self, ctx, membro: discord.Member = None, plano: str = None):
         """Concede plano de Salas Infinitas a um membro.
-        +planosinf @user 1d   → 1 dia   (R$ 10)
         +planosinf @user 4d   → 4 dias  (R$ 35,99)
-        +planosinf @user 7d   → semanal (R$ 70)
+        +planosinf @user 7d   → semanal (R$ 45)
         +planosinf @user off  → remove
         """
         from cogs.botconfig import carregar_cfg
@@ -687,9 +679,8 @@ class PlanoCog(commands.Cog):
             em = discord.Embed(
                 title="📋  +planosinf — uso",
                 description=(
-                    "`+planosinf @user 1d`  → 1 dia (R$ 10,00)\n"
                     "`+planosinf @user 4d`  → 4 dias (R$ 35,99)\n"
-                    "`+planosinf @user 7d`  → semanal (R$ 70,00)\n"
+                    "`+planosinf @user 7d`  → semanal (R$ 45,00)\n"
                     "`+planosinf @user off` → remove o plano"
                 ),
                 color=0x00CFFF,
@@ -728,7 +719,7 @@ class PlanoCog(commands.Cog):
         plano = plano.lower()
         if plano not in _DURACAO_PLANO_INF:
             return await ctx.send(
-                embed=discord.Embed(description="❌ Plano inválido. Use `1d`, `4d` ou `7d`.", color=0xFF4444),
+                embed=discord.Embed(description="❌ Plano inválido. Use `4d` ou `7d`.", color=0xFF4444),
                 delete_after=10,
             )
 
