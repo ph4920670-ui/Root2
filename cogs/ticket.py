@@ -33,9 +33,58 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
+from utils.emojis import PE, e as _e
 
 _log = logging.getLogger("salasff.tickets")
 _BR = ZoneInfo("America/Sao_Paulo")
+
+# ── Components V2 ────────────────────────────────────────────────────────────
+FLAG_V2        = 1 << 15   # 32768
+FLAG_EPHEMERAL = 1 << 6    # 64
+
+# Tickets em processo de fechamento (evita fechar 2x ao clicar rápido)
+_fechando: set[int] = set()
+
+
+def _emj(key: str) -> dict:
+    """Emoji do bot no formato dict que a API Components V2 espera."""
+    em = PE[key]
+    return {"id": str(em.id), "name": em.name, "animated": bool(em.animated)}
+
+
+async def _post_v2_channel(channel_id: int, payload: dict) -> bool:
+    """POST de uma mensagem Components V2 num canal/thread via API REST."""
+    url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+    headers = {"Authorization": f"Bot {config.DISCORD_TOKEN}", "Content-Type": "application/json"}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as s:
+            async with s.post(url, headers=headers, json=payload) as r:
+                ok = r.status in (200, 201)
+                if not ok:
+                    _log.warning(f"[v2 post] canal={channel_id} status={r.status} body={(await r.text())[:200]}")
+                return ok
+    except Exception as ex:
+        _log.warning(f"[v2 post] {ex}")
+        return False
+
+
+async def _followup_v2(inter: discord.Interaction, payload: dict, ephemeral: bool = True) -> bool:
+    """Envia followup Components V2 numa interação já deferida."""
+    flags = payload.get("flags", FLAG_V2)
+    if ephemeral:
+        flags |= FLAG_EPHEMERAL
+    payload = {**payload, "flags": flags}
+    url = f"https://discord.com/api/v10/webhooks/{inter.application_id}/{inter.token}?wait=true"
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as s:
+            async with s.post(url, json=payload) as r:
+                ok = r.status in (200, 201)
+                if not ok:
+                    _log.warning(f"[v2 followup] status={r.status} body={(await r.text())[:200]}")
+                return ok
+    except Exception as ex:
+        _log.warning(f"[v2 followup] {ex}")
+        return False
 
 
 # ═══════════════════════════════════════════
@@ -280,12 +329,68 @@ async def _upload_transcript(transcript_id: str, html: str, ticket_numero: str, 
 # ═══════════════════════════════════════════
 #  Views
 # ═══════════════════════════════════════════
+def _painel_publico_payload() -> dict:
+    """Painel público (Components V2) com o botão de abrir ticket dentro do container."""
+    return {
+        "flags": FLAG_V2,
+        "components": [{
+            "id": 1, "type": 17, "accent_color": config.COR_INFO,
+            "components": [
+                {"id": 2, "type": 10, "content": (
+                    f"## {_e('channel')}  Central de Suporte\n"
+                    f"Precisa de ajuda? Abra um ticket privado e fale com a equipe."
+                )},
+                {"id": 3, "type": 14, "divider": True, "spacing": 1},
+                {"id": 4, "type": 10, "content": (
+                    f"{_e('click')}  Um tópico **privado** é criado só pra você e o staff\n"
+                    f"{_e('vision')}  Descreva sua dúvida com detalhes\n"
+                    f"{_e('on')}  Respondemos o mais rápido possível"
+                )},
+                {"id": 5, "type": 1, "components": [
+                    {"type": 2, "style": 1, "label": "Abrir Ticket",
+                     "custom_id": "ticket:abrir", "emoji": _emj("channel")},
+                ]},
+            ],
+        }],
+    }
+
+
+def _boas_vindas_payload(user: discord.abc.User, mencao_staff: str) -> dict:
+    """Mensagem de boas-vindas do ticket (V2) com o botão Fechar dentro do container."""
+    head = f"{user.mention} {mencao_staff}".strip()
+    return {
+        "flags": FLAG_V2,
+        "allowed_mentions": {"parse": ["users", "roles"]},
+        "content": head or None,
+        "components": [{
+            "id": 1, "type": 17, "accent_color": config.COR_SUCESSO,
+            "components": [
+                {"id": 2, "type": 9,
+                 "components": [{"id": 3, "type": 10, "content": (
+                     f"## {_e('channel')}  Ticket Aberto\n"
+                     f"Olá **{user.display_name}**, bem-vindo ao suporte!"
+                 )}],
+                 "accessory": {"id": 4, "type": 11, "media": {"url": user.display_avatar.url}}},
+                {"id": 5, "type": 14, "divider": True, "spacing": 1},
+                {"id": 6, "type": 10, "content": (
+                    f"{_e('vision')}  Descreva sua dúvida ou problema aqui — a equipe já foi avisada.\n"
+                    f"{_e('off')}  Quando terminar, clique em **Fechar Ticket** abaixo."
+                )},
+                {"id": 7, "type": 1, "components": [
+                    {"type": 2, "style": 4, "label": "Fechar Ticket",
+                     "custom_id": "ticket:fechar", "emoji": _emj("off")},
+                ]},
+            ],
+        }],
+    }
+
+
 class PainelTicketPublicoView(discord.ui.View):
-    """Painel público com botão Suporte — postado no canal."""
+    """View persistente — botão Abrir Ticket do painel público."""
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Suporte", emoji="🎫", style=discord.ButtonStyle.primary, custom_id="ticket:abrir")
+    @discord.ui.button(label="Abrir Ticket", emoji=PE["channel"], style=discord.ButtonStyle.primary, custom_id="ticket:abrir")
     async def abrir(self, inter: discord.Interaction, btn: discord.ui.Button):
         if not inter.guild or not isinstance(inter.channel, discord.TextChannel):
             return await inter.response.send_message(embed=_err("Erro", "Canal inválido."), ephemeral=True)
@@ -299,12 +404,11 @@ class PainelTicketPublicoView(discord.ui.View):
         for t in inter.channel.threads:
             if t.name.startswith(f"ticket-{inter.user.id}") and not t.archived:
                 return await inter.followup.send(
-                    embed=_emb(f"⚠️  Você já tem um ticket aberto: {t.mention}", config.COR_AVISO),
+                    embed=_emb(f"{_e('awaiting')}  Você já tem um ticket aberto: {t.mention}", config.COR_AVISO),
                     ephemeral=True
                 )
 
         try:
-            # Cria thread PRIVADA (só user + cargo staff acessam)
             thread = await inter.channel.create_thread(
                 name=f"ticket-{inter.user.id}-{uuid.uuid4().hex[:6]}",
                 type=discord.ChannelType.private_thread,
@@ -320,13 +424,11 @@ class PainelTicketPublicoView(discord.ui.View):
             _log.warning(f"[abrir] erro: {ex}")
             return await inter.followup.send(embed=_err("Erro ao criar ticket", f"`{ex}`"), ephemeral=True)
 
-        # Adiciona o user
         try:
             await thread.add_user(inter.user)
         except Exception:
             pass
 
-        # Adiciona membros do cargo staff (se configurado)
         mencao_staff = ""
         if cargo_staff_id:
             cargo = inter.guild.get_role(cargo_staff_id)
@@ -338,119 +440,128 @@ class PainelTicketPublicoView(discord.ui.View):
                     except Exception:
                         pass
 
-        # Msg de boas-vindas + botão fechar
-        em_boas = discord.Embed(
-            title="🎫  Ticket Aberto",
-            description=(
-                f"Olá {inter.user.mention}, bem-vindo ao suporte!\n\n"
-                f"Descreva sua dúvida ou problema aqui. A equipe responderá em breve.\n\n"
-                f"▸ Para fechar o ticket, clique no botão abaixo."
-            ),
-            color=config.COR_INFO,
-        )
-        em_boas.set_footer(text="F Applications • Suporte")
-
-        try:
-            await thread.send(
-                content=f"{inter.user.mention} {mencao_staff}".strip(),
-                embed=em_boas,
-                view=FecharTicketView(),
-            )
-        except Exception as ex:
-            _log.warning(f"[abrir send] {ex}")
+        # Boas-vindas em Components V2 (botão Fechar dentro do container)
+        ok = await _post_v2_channel(thread.id, _boas_vindas_payload(inter.user, mencao_staff))
+        if not ok:
+            # Fallback simples se o V2 falhar (nunca deixa o ticket sem botão)
+            try:
+                em = discord.Embed(title="🎫  Ticket Aberto",
+                                   description=f"{inter.user.mention}, descreva sua dúvida. Clique em **Fechar Ticket** quando terminar.",
+                                   color=config.COR_SUCESSO)
+                await thread.send(content=f"{inter.user.mention} {mencao_staff}".strip(),
+                                  embed=em, view=FecharTicketView())
+            except Exception as ex:
+                _log.warning(f"[abrir send fallback] {ex}")
 
         await inter.followup.send(
-            embed=_emb(f"✅  Seu ticket foi aberto: {thread.mention}", config.COR_SUCESSO),
+            embed=_emb(f"{_e('on')}  Seu ticket foi aberto: {thread.mention}", config.COR_SUCESSO),
             ephemeral=True
         )
 
 
 class FecharTicketView(discord.ui.View):
-    """Botão Fechar dentro do ticket."""
+    """View persistente — botão Fechar Ticket."""
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Fechar Ticket", emoji="🔒", style=discord.ButtonStyle.danger, custom_id="ticket:fechar")
+    @discord.ui.button(label="Fechar Ticket", emoji=PE["off"], style=discord.ButtonStyle.danger, custom_id="ticket:fechar")
     async def fechar(self, inter: discord.Interaction, btn: discord.ui.Button):
-        if not isinstance(inter.channel, discord.Thread):
-            return await inter.response.send_message(embed=_err("Canal inválido."), ephemeral=True)
+        await _fechar_ticket(inter)
 
-        thread: discord.Thread = inter.channel
+
+async def _fechar_ticket(inter: discord.Interaction):
+    """Lógica de fechamento — robusta contra clique duplo e thread já arquivada."""
+    if not isinstance(inter.channel, discord.Thread):
+        return await inter.response.send_message(embed=_err("Canal inválido", "Esse botão só funciona dentro de um ticket."), ephemeral=True)
+
+    thread: discord.Thread = inter.channel
+
+    # Já está sendo fechado? (clique duplo)
+    if thread.id in _fechando:
+        return await inter.response.send_message(
+            embed=_emb(f"{_e('awaiting')}  Esse ticket já está sendo fechado…", config.COR_AVISO),
+            ephemeral=True,
+        )
+    # Já arquivado?
+    if thread.archived:
+        return await inter.response.send_message(
+            embed=_emb(f"{_e('off')}  Esse ticket já está fechado.", config.COR_AVISO),
+            ephemeral=True,
+        )
+
+    _fechando.add(thread.id)
+    try:
         await inter.response.defer(ephemeral=True, thinking=True)
 
-        # Coleta mensagens
         try:
             msgs = await _coletar_mensagens(thread)
         except Exception as ex:
             _log.warning(f"[fechar coleta] {ex}")
-            return await inter.followup.send(embed=_err("Erro ao coletar mensagens.", f"`{ex}`"), ephemeral=True)
+            msgs = []
 
-        # Gera HTML
+        link = None
+        html = None
         try:
             html = _render_transcript_html(thread, msgs, inter.user)
+            transcript_id = f"{thread.id}-{uuid.uuid4().hex[:8]}"
+            guild_name = thread.guild.name if thread.guild else "?"
+            link = await _upload_transcript(transcript_id, html, thread.name, guild_name, inter.user.display_name)
         except Exception as ex:
-            _log.warning(f"[fechar html] {ex}")
-            return await inter.followup.send(embed=_err("Erro ao gerar transcript.", f"`{ex}`"), ephemeral=True)
+            _log.warning(f"[fechar transcript] {ex}")
 
-        # Upload no site
-        transcript_id = f"{thread.id}-{uuid.uuid4().hex[:8]}"
-        guild_name = thread.guild.name if thread.guild else "?"
-        ticket_num = thread.name
-
-        link = await _upload_transcript(transcript_id, html, ticket_num, guild_name, inter.user.display_name)
-
-        # Posta no canal de logs (se configurado)
-        cfg = _get_guild_cfg(thread.guild.id)
+        # Log no canal configurado
+        cfg = _get_guild_cfg(thread.guild.id) if thread.guild else {}
         canal_logs_id = cfg.get("canal_logs")
-        canal_logs = thread.guild.get_channel(canal_logs_id) if canal_logs_id else None
+        canal_logs = thread.guild.get_channel(canal_logs_id) if (thread.guild and canal_logs_id) else None
 
-        if canal_logs and link:
-            em_log = discord.Embed(
-                title="🔒  Ticket Fechado",
-                color=config.COR_AVISO,
-                timestamp=datetime.now(_BR),
-            )
-            em_log.add_field(name="Ticket", value=f"`{ticket_num}`", inline=False)
-            em_log.add_field(name="Fechado por", value=f"{inter.user.mention}", inline=True)
-            em_log.add_field(name="Mensagens", value=f"`{len(msgs)}`", inline=True)
-            em_log.add_field(name="Transcript", value=f"[Abrir no site]({link})", inline=False)
-            em_log.set_footer(text="F Applications • Logs")
-
-            view_log = discord.ui.View(timeout=None)
-            view_log.add_item(discord.ui.Button(label="Ver Transcript", url=link, style=discord.ButtonStyle.link, emoji="📋"))
-
+        if canal_logs:
             try:
-                await canal_logs.send(embed=em_log, view=view_log)
+                _comps = [
+                    {"id": 2, "type": 10, "content": (
+                        f"## {_e('off')}  Ticket Fechado\n"
+                        f"{_e('channel')}  **Ticket:** `{thread.name}`"
+                    )},
+                    {"id": 3, "type": 14, "divider": True, "spacing": 1},
+                    {"id": 4, "type": 10, "content": (
+                        f"{_e('roles')}  **Fechado por:** {inter.user.mention}\n"
+                        f"{_e('stats')}  **Mensagens:** `{len(msgs)}`\n"
+                        f"{_e('clock')}  {datetime.now(_BR).strftime('%d/%m/%Y às %H:%M')} (BRT)"
+                    )},
+                ]
+                if link:
+                    _comps.append({"id": 5, "type": 1, "components": [
+                        {"type": 2, "style": 5, "label": "Ver Transcript", "url": link, "emoji": _emj("vision")},
+                    ]})
+                await _post_v2_channel(canal_logs.id, {
+                    "flags": FLAG_V2, "components": [{"id": 1, "type": 17, "accent_color": config.COR_AVISO, "components": _comps}],
+                })
+                # HTML como backup
+                if html:
+                    await canal_logs.send(file=discord.File(io.BytesIO(html.encode("utf-8")), filename=f"{thread.name}.html"))
             except Exception as ex:
                 _log.warning(f"[fechar log] {ex}")
 
-        # Envia também o HTML como arquivo (backup, caso site caia)
-        try:
-            html_file = discord.File(io.BytesIO(html.encode("utf-8")), filename=f"{ticket_num}.html")
-            if canal_logs:
-                await canal_logs.send(file=html_file)
-        except Exception:
-            pass
-
-        # Resposta final + arquiva thread
+        # Resposta ao usuário
         if link:
-            await inter.followup.send(
-                embed=_emb(f"✅  Ticket fechado!\n\n🔗 [Ver transcript]({link})", config.COR_SUCESSO),
-                ephemeral=True
-            )
+            await inter.followup.send(embed=_emb(f"{_e('on')}  Ticket fechado!\n{_e('vision')}  [Ver transcript]({link})", config.COR_SUCESSO), ephemeral=True)
         else:
-            await inter.followup.send(
-                embed=_emb("⚠️  Ticket fechado, mas houve erro no upload do transcript. O arquivo foi enviado no canal de logs (se configurado).", config.COR_AVISO),
-                ephemeral=True
-            )
+            await inter.followup.send(embed=_emb(f"{_e('on')}  Ticket fechado. (transcript indisponível)", config.COR_AVISO), ephemeral=True)
 
-        # Mensagem final no próprio thread + arquiva
+        # Mensagem final + arquiva
         try:
-            await thread.send(embed=_emb("🔒  Este ticket foi fechado. O tópico será arquivado em instantes.", config.COR_AVISO))
-            await asyncio.sleep(2)
+            await thread.send(embed=_emb(f"{_e('off')}  Ticket fechado por {inter.user.mention}. Arquivando…", config.COR_AVISO))
+            await asyncio.sleep(1)
             await thread.edit(archived=True, locked=True, reason=f"Fechado por {inter.user}")
+        except discord.Forbidden:
+            _log.warning("[fechar arquivar] sem permissão Gerenciar Threads")
+            try:
+                await thread.send(embed=_err("Não consegui arquivar", "Falta a permissão **Gerenciar Tópicos** ao bot. O transcript já foi salvo."))
+            except Exception:
+                pass
         except Exception as ex:
             _log.warning(f"[fechar arquivar] {ex}")
+    finally:
+        _fechando.discard(thread.id)
 
 
 # ═══════════════════════════════════════════
@@ -468,24 +579,18 @@ class PainelAdminView(discord.ui.View):
 
         await inter.response.defer(ephemeral=True)
 
-        em = discord.Embed(
-            title="🎫  Central de Suporte",
-            description=(
-                "Precisa de ajuda? Clique no botão abaixo para abrir um ticket privado.\n\n"
-                "▸ Um tópico será criado só para você e nossa equipe.\n"
-                "▸ Descreva sua dúvida com detalhes.\n"
-                "▸ Responderemos o mais rápido possível."
-            ),
-            color=config.COR_INFO,
-        )
-        em.set_footer(text="F Applications • Suporte")
+        ok = await _post_v2_channel(inter.channel.id, _painel_publico_payload())
+        if not ok:
+            # Fallback discord.py se o V2 falhar
+            try:
+                em = discord.Embed(title="🎫  Central de Suporte",
+                                   description="Clique em **Abrir Ticket** para falar com a equipe.",
+                                   color=config.COR_INFO)
+                await inter.channel.send(embed=em, view=PainelTicketPublicoView())
+            except Exception as ex:
+                return await inter.followup.send(embed=_err("Erro ao enviar.", f"`{ex}`"), ephemeral=True)
 
-        try:
-            await inter.channel.send(embed=em, view=PainelTicketPublicoView())
-        except Exception as ex:
-            return await inter.followup.send(embed=_err("Erro ao enviar.", f"`{ex}`"), ephemeral=True)
-
-        await inter.followup.send(embed=_emb("✅  Painel enviado.", config.COR_SUCESSO), ephemeral=True)
+        await inter.followup.send(embed=_emb(f"{_e('on')}  Painel enviado.", config.COR_SUCESSO), ephemeral=True)
 
     @discord.ui.button(label="Canal de Logs", emoji="📁", style=discord.ButtonStyle.primary, row=0)
     async def canal_logs(self, inter: discord.Interaction, btn: discord.ui.Button):
@@ -603,13 +708,13 @@ class TicketCog(commands.Cog):
             return await inter.response.send_message(embed=_err("Sem permissão."), ephemeral=True)
 
         em = discord.Embed(
-            title="🎫  Painel de Tickets",
+            title=f"{_e('channel')}  Painel de Tickets",
             description=(
                 "Configure o sistema de tickets:\n\n"
-                "▸ **Enviar Painel** — posta no canal atual o painel com botão `Suporte`.\n"
-                "▸ **Canal de Logs** — onde os transcripts serão enviados quando fechar um ticket.\n"
-                "▸ **Cargo de Staff** — quem será adicionado nos tickets (além do usuário).\n"
-                "▸ **Ver Configuração** — mostra a config atual da guild."
+                f"{_e('enviar')} **Enviar Painel** — posta o painel com botão **Abrir Ticket**.\n"
+                f"{_e('channel')} **Canal de Logs** — onde os transcripts vão ao fechar.\n"
+                f"{_e('roles')} **Cargo de Staff** — quem é adicionado nos tickets.\n"
+                f"{_e('info')} **Ver Configuração** — mostra a config atual."
             ),
             color=config.COR_INFO,
         )
@@ -620,3 +725,9 @@ class TicketCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TicketCog(bot))
+    # Views persistentes — botões sobrevivem a restart (corrige "não consigo fechar")
+    for _ViewCls in (PainelTicketPublicoView, FecharTicketView):
+        try:
+            bot.add_view(_ViewCls())
+        except Exception as ex:
+            _log.warning(f"[setup] add_view {_ViewCls.__name__}: {ex}")

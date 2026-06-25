@@ -72,3 +72,10 @@ QUANTIAS_DISPONIVEIS = [int(x) for x in os.environ.get(
 DEFAULT_INICIAR_MINUTOS   = int(os.environ.get("DEFAULT_INICIAR_MINUTOS", "5"))
 SALA_TIMEOUT_SECONDS      = int(os.environ.get("SALA_TIMEOUT_SECONDS", "60"))
 POLLING_INTERVAL_SECONDS  = int(os.environ.get("POLLING_INTERVAL_SECONDS", "5"))
+
+# ── Tickets ────────────────────────────────────────────────────────────────
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TICKETS_CONFIG_PATH   = os.environ.get(
+    "TICKETS_CONFIG_PATH", os.path.join(_BASE_DIR, "tickets_config.json"))
+FTICKETS_URL          = os.environ.get("FTICKETS_URL", "https://ftickets.discloud.app")
+FTICKETS_UPLOAD_TOKEN = os.environ.get("FTICKETS_UPLOAD_TOKEN", "")
