@@ -19,6 +19,9 @@ data/efi_certs/
 # Dados locais
 bonus_data.json
 app_emojis_cache.json
+botconfig.json
+tickets_config.json
+planos_config.json
 
 # Logs
 *.log
